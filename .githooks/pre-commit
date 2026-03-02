@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "==> Running cargo fmt --check"
+if ! cargo fmt -- --check; then
+    echo ""
+    echo "ERROR: cargo fmt found unformatted code."
+    cargo fmt
+    exit 1
+fi
+
+echo "==> Running cargo build --release"
+cargo build --release
+
+echo "==> Running cargo test --release"
+cargo test --release
+
+echo "==> Running cargo clippy"
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+echo "==> Checking frontend formatting"
+cd web
+if ! bun run fmt:check; then
+    echo ""
+    echo "ERROR: biome found unformatted code. Run 'bun run fmt' to fix."
+    exit 1
+fi
+
+echo "==> Building frontend"
+if ! bun run build; then
+    echo ""
+    echo "ERROR: frontend build failed."
+    exit 1
+fi
+cd ..
+
+echo "==> All checks passed."
