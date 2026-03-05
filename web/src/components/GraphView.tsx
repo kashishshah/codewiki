@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
 import type { GraphNode, GraphEdge } from "../types";
-import { KIND_COLORS, EDGE_COLORS, FILTERABLE_KINDS } from "../constants";
+import { KIND_COLORS, EDGE_COLORS } from "../constants";
 
 interface GraphViewProps {
   nodes: GraphNode[];
@@ -9,9 +9,11 @@ interface GraphViewProps {
   selectedNodeId: string | null;
   contextNodeIds: string[];
   scopedPath: string | null;
+  hiddenKinds: Set<string>;
+  minLines: number;
+  hideTests: boolean;
   onSelectNode: (id: string) => void;
   onToggleContext: (id: string) => void;
-  onClearScope: () => void;
 }
 
 interface SimNode extends d3.SimulationNodeDatum {
@@ -31,24 +33,47 @@ export function GraphView({
   selectedNodeId,
   contextNodeIds,
   scopedPath,
+  hiddenKinds,
+  minLines,
+  hideTests,
   onSelectNode,
   onToggleContext,
-  onClearScope,
 }: GraphViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const simulationRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
-  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set());
 
-  const toggleKind = (kind: string) => {
-    setHiddenKinds((prev) => {
-      const next = new Set(prev);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      return next;
-    });
-  };
+  // Refs for values that change frequently — avoid restarting simulation
+  const selectedRef = useRef(selectedNodeId);
+  selectedRef.current = selectedNodeId;
+  const contextRef = useRef(contextNodeIds);
+  contextRef.current = contextNodeIds;
+  const onSelectRef = useRef(onSelectNode);
+  onSelectRef.current = onSelectNode;
+  const onToggleRef = useRef(onToggleContext);
+  onToggleRef.current = onToggleContext;
 
-  const render = useCallback(() => {
+  // Ref to hold D3 circle selection for style updates without re-render
+  const circlesRef = useRef<d3.Selection<SVGCircleElement, SimNode, SVGGElement, unknown> | null>(
+    null,
+  );
+
+  // Update circle strokes when selection/context changes (no simulation restart)
+  useEffect(() => {
+    if (!circlesRef.current) return;
+    circlesRef.current
+      .attr("stroke", (d) => {
+        if (d.id === selectedNodeId) return "#fff";
+        if (contextNodeIds.includes(d.id)) return "#22d3ee";
+        return "none";
+      })
+      .attr("stroke-width", (d) => {
+        if (d.id === selectedNodeId || contextNodeIds.includes(d.id)) return 3;
+        return 0;
+      });
+  }, [selectedNodeId, contextNodeIds]);
+
+  // Main simulation — only restarts when graph structure changes
+  const buildSimulation = useCallback(() => {
     if (!svgRef.current) return;
     const svgEl = svgRef.current;
     const svg = d3.select(svgEl);
@@ -56,11 +81,17 @@ export function GraphView({
     const height = svgEl.clientHeight || 600;
 
     svg.selectAll("*").remove();
+    circlesRef.current = null;
 
-    // Filter nodes: exclude files, hidden kinds, and apply file scope
     const visibleNodes = nodes.filter((n) => {
       if (n.kind === "file") return false;
       if (hiddenKinds.has(n.kind)) return false;
+      if (minLines > 0 && n.end_line - n.start_line < minLines) return false;
+      if (
+        hideTests &&
+        (n.name.startsWith("test_") || n.name === "tests" || n.file_path.includes("/tests/"))
+      )
+        return false;
       if (scopedPath && n.file_path !== scopedPath && !n.file_path.startsWith(scopedPath + "/"))
         return false;
       return true;
@@ -68,16 +99,12 @@ export function GraphView({
     const nodeIds = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = edges.filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to));
 
-    // Compute connectivity (edge count per node)
     const edgeCount = new Map<string, number>();
     for (const e of visibleEdges) {
       edgeCount.set(e.from, (edgeCount.get(e.from) || 0) + 1);
       edgeCount.set(e.to, (edgeCount.get(e.to) || 0) + 1);
     }
 
-    // Compute radius: base from lines of code, bonus from connectivity
-    // Lines: clamp to [1, 200], map to [5, 16] via sqrt scale
-    // Connectivity: each edge adds 0.5, capped at +6
     const computeRadius = (node: GraphNode) => {
       const lines = Math.max(1, node.end_line - node.start_line || 1);
       const lineRadius = 5 + Math.sqrt(Math.min(lines, 200) / 200) * 11;
@@ -99,12 +126,12 @@ export function GraphView({
       kind: e.kind,
     }));
 
-    // Adaptive forces based on node count
     const n = simNodes.length;
     const chargeStrength = n > 200 ? -400 : n > 50 ? -300 : -200;
     const linkDist = n > 200 ? 150 : n > 50 ? 100 : 80;
     const collisionRadius = n > 200 ? 15 : 25;
 
+    // Pre-compute layout silently so nodes don't visibly jitter on load
     const simulation = d3
       .forceSimulation<SimNode, SimLink>(simNodes)
       .force(
@@ -119,7 +146,16 @@ export function GraphView({
       .force(
         "collision",
         d3.forceCollide<SimNode>().radius((d) => d.radius + collisionRadius),
-      );
+      )
+      .alphaDecay(0.04)
+      .velocityDecay(0.3)
+      .stop();
+
+    // Run simulation to completion synchronously
+    const ticks = Math.ceil(
+      Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay()),
+    );
+    for (let i = 0; i < ticks; i++) simulation.tick();
 
     simulationRef.current = simulation;
 
@@ -127,7 +163,7 @@ export function GraphView({
 
     const defs = svg.append("defs");
     const filter = defs.append("filter").attr("id", "glow");
-    filter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "blur");
+    filter.append("feGaussianBlur").attr("stdDeviation", "2").attr("result", "blur");
     const merge = filter.append("feMerge");
     merge.append("feMergeNode").attr("in", "blur");
     merge.append("feMergeNode").attr("in", "SourceGraphic");
@@ -180,20 +216,22 @@ export function GraphView({
           }),
       );
 
-    node
+    const circles = node
       .append("circle")
       .attr("r", (d) => d.radius)
       .attr("fill", (d) => KIND_COLORS[d.kind] || "#78909c")
       .attr("filter", "url(#glow)")
       .attr("stroke", (d) => {
-        if (d.id === selectedNodeId) return "#fff";
-        if (contextNodeIds.includes(d.id)) return "#22d3ee";
+        if (d.id === selectedRef.current) return "#fff";
+        if (contextRef.current.includes(d.id)) return "#22d3ee";
         return "none";
       })
       .attr("stroke-width", (d) => {
-        if (d.id === selectedNodeId || contextNodeIds.includes(d.id)) return 3;
+        if (d.id === selectedRef.current || contextRef.current.includes(d.id)) return 3;
         return 0;
       });
+
+    circlesRef.current = circles;
 
     node
       .append("text")
@@ -201,14 +239,14 @@ export function GraphView({
       .attr("x", 14)
       .attr("y", 4)
       .attr("font-size", "11px")
-      .attr("fill", "#94a3b8");
+      .attr("fill", "#6b7280");
 
-    // Click handlers — delay single-click so double-click can cancel it
+    // Click handlers — use refs to avoid stale closures
     let clickTimer: ReturnType<typeof setTimeout> | null = null;
     node.on("click", (_event, d) => {
       if (clickTimer) clearTimeout(clickTimer);
       clickTimer = setTimeout(() => {
-        onSelectNode(d.id);
+        onSelectRef.current(d.id);
         clickTimer = null;
       }, 250);
     });
@@ -217,78 +255,69 @@ export function GraphView({
         clearTimeout(clickTimer);
         clickTimer = null;
       }
-      onToggleContext(d.id);
+      onToggleRef.current(d.id);
     });
 
-    simulation.on("tick", () => {
+    // Render pre-computed positions immediately
+    const updatePositions = () => {
       link
         .attr("x1", (d) => (d.source as SimNode).x ?? 0)
         .attr("y1", (d) => (d.source as SimNode).y ?? 0)
         .attr("x2", (d) => (d.target as SimNode).x ?? 0)
         .attr("y2", (d) => (d.target as SimNode).y ?? 0);
-
       node.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
-    });
+    };
+    updatePositions();
+
+    // Fit to viewport immediately
+    if (simNodes.length > 0) {
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      for (const d of simNodes) {
+        const x = d.x ?? 0,
+          y = d.y ?? 0,
+          r = d.radius;
+        if (x - r < minX) minX = x - r;
+        if (y - r < minY) minY = y - r;
+        if (x + r > maxX) maxX = x + r;
+        if (y + r > maxY) maxY = y + r;
+      }
+      const pad = 60;
+      minX -= pad;
+      minY -= pad;
+      maxX += pad;
+      maxY += pad;
+      const bw = maxX - minX,
+        bh = maxY - minY;
+      if (bw > 0 && bh > 0) {
+        const scale = Math.min(width / bw, height / bh, 2);
+        const tx = (width - bw * scale) / 2 - minX * scale;
+        const ty = (height - bh * scale) / 2 - minY * scale;
+        svg.call(zoom.transform as never, d3.zoomIdentity.translate(tx, ty).scale(scale));
+      }
+    }
+
+    // Restart simulation for drag interactions only
+    simulation.on("tick", updatePositions).restart();
 
     return () => {
       simulation.stop();
     };
-  }, [
-    nodes,
-    edges,
-    selectedNodeId,
-    contextNodeIds,
-    scopedPath,
-    hiddenKinds,
-    onSelectNode,
-    onToggleContext,
-  ]);
+  }, [nodes, edges, scopedPath, hiddenKinds, minLines, hideTests]);
 
   useEffect(() => {
-    render();
+    const cleanup = buildSimulation();
     return () => {
+      cleanup?.();
       simulationRef.current?.stop();
     };
-  }, [render]);
-
-  const scopedName = scopedPath?.split("/").pop();
+  }, [buildSimulation]);
 
   return (
     <div className="w-full h-full bg-black">
       <svg ref={svgRef} className="w-full h-full" />
-
-      {scopedPath && (
-        <div className="absolute top-3 left-3 z-10">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-black/60 backdrop-blur border border-white/[0.07] rounded-full text-xs text-slate-300">
-            Viewing: {scopedName}
-            <button onClick={onClearScope} className="text-slate-500 hover:text-slate-200 ml-1">
-              ✕
-            </button>
-          </span>
-        </div>
-      )}
-
-      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur border border-white/[0.07] rounded-lg p-1.5 flex flex-wrap gap-1 z-10">
-        {FILTERABLE_KINDS.map((kind) => {
-          const hidden = hiddenKinds.has(kind);
-          return (
-            <button
-              key={kind}
-              onClick={() => toggleKind(kind)}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-opacity ${
-                hidden ? "opacity-30" : "opacity-100"
-              }`}
-              title={hidden ? `Show ${kind}` : `Hide ${kind}`}
-            >
-              <span
-                className="w-2 h-2 rounded-full inline-block"
-                style={{ backgroundColor: KIND_COLORS[kind] }}
-              />
-              <span className="text-slate-400">{kind.charAt(0).toUpperCase()}</span>
-            </button>
-          );
-        })}
-      </div>
 
       <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur border border-white/[0.07] rounded p-2 text-xs flex flex-wrap gap-3">
         {Object.entries(KIND_COLORS).map(([kind, color]) => (

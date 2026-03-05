@@ -13,6 +13,7 @@ interface ChatPanelProps {
   contextNodeIds: string[];
   nodes: GraphNode[];
   onRemoveContext: (id: string) => void;
+  onClearContext: () => void;
   onClose: () => void;
 }
 
@@ -21,6 +22,7 @@ export function ChatPanel({
   contextNodeIds,
   nodes,
   onRemoveContext,
+  onClearContext,
   onClose,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -42,97 +44,135 @@ export function ChatPanel({
     .filter(Boolean) as GraphNode[];
 
   return (
-    <div className="flex flex-col h-72">
-      <div className="px-3 py-1.5 border-b border-white/[0.07] flex items-center justify-between shrink-0">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Chat</span>
+    <div className="flex flex-col h-[28rem]">
+      {/* Header */}
+      <div className="px-4 py-2.5 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-200">Chat</span>
+          {chat.messages.length > 0 && (
+            <button
+              type="button"
+              onClick={chat.clear}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-300 text-sm px-1"
+          className="w-6 h-6 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors text-xs"
           title="Close chat"
         >
-          ▼
+          {"\u2715"}
         </button>
       </div>
+
+      {/* Context chips */}
       {contextNodes.length > 0 && (
-        <div className="px-3 py-2 border-b border-white/[0.07] flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-500">Context:</span>
-          {contextNodes.map((n) => (
-            <span
-              key={n.id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-900/50 border border-cyan-700 rounded text-xs text-cyan-300"
-            >
-              {n.name}
-              <button onClick={() => onRemoveContext(n.id)} className="hover:text-cyan-100">
-                ×
-              </button>
+        <div className="px-4 pb-2 shrink-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] uppercase tracking-wider text-slate-600">
+              Context ({contextNodes.length})
             </span>
-          ))}
+            <button
+              onClick={onClearContext}
+              className="text-[10px] text-slate-600 hover:text-slate-300 transition-colors"
+            >
+              Clear all
+            </button>
+          </div>
+          <div
+            className="max-h-24 overflow-y-auto overscroll-contain"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div className="flex flex-wrap gap-1">
+              {contextNodes.map((n) => (
+                <span
+                  key={n.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[11px] text-cyan-400"
+                >
+                  {n.name}
+                  <button
+                    onClick={() => onRemoveContext(n.id)}
+                    className="hover:text-cyan-200 text-cyan-600 ml-0.5"
+                  >
+                    {"\u00d7"}
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
         {chat.messages.length === 0 && (
-          <p className="text-sm text-slate-500 text-center mt-8">
-            Select code nodes (double-click) to add context, then ask a question.
+          <p className="text-sm text-slate-600 text-center mt-10">
+            Double-click nodes to add context, then ask a question.
           </p>
         )}
         {chat.messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`text-sm ${msg.role === "user" ? "text-blue-300" : "text-slate-300"}`}
-          >
-            <span className="text-xs text-slate-500 mr-2">
-              {msg.role === "user" ? "You" : "Claude"}:
-            </span>
-            {msg.role === "assistant" ? (
-              <div className="inline prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+          <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : ""}`}>
+            {msg.role === "assistant" && (
+              <div className="w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-[10px] text-violet-400">C</span>
               </div>
-            ) : (
-              <span>{msg.content}</span>
             )}
+            <div
+              className={`max-w-[85%] text-sm leading-relaxed ${
+                msg.role === "user"
+                  ? "px-3 py-2 rounded-2xl rounded-br-md bg-blue-600/20 border border-blue-500/20 text-blue-100"
+                  : "text-slate-300"
+              }`}
+            >
+              {msg.role === "assistant" ? (
+                <div className="prose prose-invert prose-sm max-w-none [&_p]:my-1 [&_pre]:bg-white/[0.04] [&_pre]:rounded-lg [&_code]:text-cyan-300">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <span>{msg.content}</span>
+              )}
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="px-3 py-2 border-t border-white/[0.07] flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            contextNodeIds.length > 0
-              ? "Ask about the selected code..."
-              : "Add context nodes first (double-click in graph)..."
-          }
-          className="flex-1 px-3 py-1.5 bg-white/[0.05] border border-white/[0.1] rounded text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-          disabled={chat.streaming}
-        />
-        {chat.streaming ? (
-          <button
-            type="button"
-            onClick={chat.cancel}
-            className="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >
-            Stop
-          </button>
-        ) : (
-          <button
-            type="submit"
-            className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-            disabled={!input.trim()}
-          >
-            Send
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={chat.clear}
-          className="px-3 py-1.5 bg-white/[0.07] text-slate-300 rounded text-sm hover:bg-white/[0.1]"
-        >
-          Clear
-        </button>
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="px-4 py-3 shrink-0">
+        <div className="flex gap-2 items-center bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 focus-within:border-blue-500/40 transition-colors">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              contextNodeIds.length > 0
+                ? "Ask about the selected code..."
+                : "Add context nodes first (double-click)..."
+            }
+            className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 focus:outline-none py-1"
+            disabled={chat.streaming}
+          />
+          {chat.streaming ? (
+            <button
+              type="button"
+              onClick={chat.cancel}
+              className="px-3 py-1 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs hover:bg-red-500/30 transition-colors"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-30"
+              disabled={!input.trim()}
+            >
+              Send
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

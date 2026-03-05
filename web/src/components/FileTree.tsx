@@ -3,7 +3,7 @@ import type { FileEntry } from "../types";
 
 interface FileTreeProps {
   entries: FileEntry[];
-  onSelectFile: (path: string) => void;
+  onSelectFile: (path: string, isDir: boolean) => void;
   depth?: number;
 }
 
@@ -23,7 +23,7 @@ function FileTreeNode({
   depth,
 }: {
   entry: FileEntry;
-  onSelectFile: (path: string) => void;
+  onSelectFile: (path: string, isDir: boolean) => void;
   depth: number;
 }) {
   const [expanded, setExpanded] = useState(depth < 2);
@@ -38,7 +38,7 @@ function FileTreeNode({
           <button
             onClick={() => {
               setExpanded(true);
-              onSelectFile(entry.path);
+              onSelectFile(entry.path, true);
             }}
             className="flex-1 text-left py-1 flex items-center gap-1"
           >
@@ -55,7 +55,7 @@ function FileTreeNode({
 
   return (
     <button
-      onClick={() => onSelectFile(entry.path)}
+      onClick={() => onSelectFile(entry.path, false)}
       className="w-full text-left px-2 py-1 hover:bg-white/[0.05] text-sm flex items-center gap-1 text-slate-300 ml-3"
     >
       <span className="text-slate-500">📄</span>

@@ -28,7 +28,9 @@ pub async fn serve(
         graph,
         chat: ChatState::new(backend, model),
     });
-    let spa = ServeDir::new("web/dist").not_found_service(ServeFile::new("web/dist/index.html"));
+    let dist_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("web/dist");
+    let spa =
+        ServeDir::new(&dist_dir).not_found_service(ServeFile::new(dist_dir.join("index.html")));
 
     let app = Router::new()
         .nest("/api", api::routes())

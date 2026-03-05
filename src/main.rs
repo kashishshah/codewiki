@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         Command::Index { path } => {
             let (graph, _) = index_project(path)?;
             println!(
-                "indexed {} nodes, {} edges → .codewiki/graph.json",
+                "indexed {} nodes, {} edges",
                 graph.nodes.len(),
                 graph.edges.len()
             );
