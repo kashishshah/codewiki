@@ -1,3 +1,5 @@
+pub mod elixir;
+pub mod python;
 pub mod rust;
 
 use anyhow::Result;
@@ -30,7 +32,11 @@ pub struct ParserRegistry {
 impl ParserRegistry {
     pub fn new() -> Self {
         Self {
-            parsers: vec![Arc::new(rust::RustParser::new())],
+            parsers: vec![
+                Arc::new(rust::RustParser::new()),
+                Arc::new(python::PythonParser::new()),
+                Arc::new(elixir::ElixirParser::new()),
+            ],
         }
     }
 

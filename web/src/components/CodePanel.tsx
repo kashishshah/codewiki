@@ -1,11 +1,15 @@
 import { useEffect, useRef } from "react";
 import hljs from "highlight.js/lib/core";
 import rust from "highlight.js/lib/languages/rust";
+import python from "highlight.js/lib/languages/python";
+import elixir from "highlight.js/lib/languages/elixir";
 import "highlight.js/styles/atom-one-dark.css";
 import type { NodeDetail } from "../types";
 import { KindBadge } from "../App";
 
 hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("elixir", elixir);
 
 interface CodePanelProps {
   detail: NodeDetail | null;
@@ -75,7 +79,7 @@ export function CodePanel({ detail, isContext, onToggleContext, onClose }: CodeP
       <div className="flex-1 overflow-y-auto px-4 py-2">
         {detail.body ? (
           <pre className="text-xs leading-relaxed overflow-x-auto">
-            <code ref={codeRef} className="language-rust whitespace-pre">
+            <code ref={codeRef} className={`language-${detail.language || "rust"} whitespace-pre`}>
               {detail.body}
             </code>
           </pre>

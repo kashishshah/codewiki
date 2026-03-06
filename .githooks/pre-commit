@@ -23,6 +23,7 @@ cd web
 if ! bun run fmt:check; then
     echo ""
     echo "ERROR: biome found unformatted code. Run 'bun run fmt' to fix."
+    bun run fmt
     exit 1
 fi
 

@@ -10,6 +10,7 @@ interface GraphViewProps {
   contextNodeIds: string[];
   scopedPath: string | null;
   hiddenKinds: Set<string>;
+  hiddenLanguages: Set<string>;
   minLines: number;
   hideTests: boolean;
   onSelectNode: (id: string) => void;
@@ -34,6 +35,7 @@ export function GraphView({
   contextNodeIds,
   scopedPath,
   hiddenKinds,
+  hiddenLanguages,
   minLines,
   hideTests,
   onSelectNode,
@@ -86,10 +88,18 @@ export function GraphView({
     const visibleNodes = nodes.filter((n) => {
       if (n.kind === "file") return false;
       if (hiddenKinds.has(n.kind)) return false;
+      if (n.language && hiddenLanguages.has(n.language)) return false;
       if (minLines > 0 && n.end_line - n.start_line < minLines) return false;
       if (
         hideTests &&
-        (n.name.startsWith("test_") || n.name === "tests" || n.file_path.includes("/tests/"))
+        (n.name.startsWith("test_") ||
+          n.name.startsWith("Test") ||
+          n.name === "tests" ||
+          n.file_path.includes("/tests/") ||
+          n.file_path.includes("/test/") ||
+          n.file_path.endsWith("_test.py") ||
+          n.file_path.endsWith("_test.exs") ||
+          n.file_path.endsWith("_test.ex"))
       )
         return false;
       if (scopedPath && n.file_path !== scopedPath && !n.file_path.startsWith(scopedPath + "/"))
@@ -191,6 +201,9 @@ export function GraphView({
       .attr("stroke-width", scopedPath ? 1.5 : 1)
       .attr("stroke-dasharray", (d) => (d.kind === "implements" ? "4,4" : "none"));
 
+    // Track whether the current gesture is a drag vs a click
+    const dragState = { dragged: false };
+
     const node = g
       .append("g")
       .selectAll<SVGGElement, SimNode>("g")
@@ -201,11 +214,13 @@ export function GraphView({
         d3
           .drag<SVGGElement, SimNode>()
           .on("start", (event, d) => {
+            dragState.dragged = false;
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
           })
           .on("drag", (event, d) => {
+            dragState.dragged = true;
             d.fx = event.x;
             d.fy = event.y;
           })
@@ -243,14 +258,18 @@ export function GraphView({
 
     // Click handlers — use refs to avoid stale closures
     let clickTimer: ReturnType<typeof setTimeout> | null = null;
-    node.on("click", (_event, d) => {
+    node.on("click", (event, d) => {
+      if (dragState.dragged) return;
+      event.stopPropagation();
       if (clickTimer) clearTimeout(clickTimer);
       clickTimer = setTimeout(() => {
         onSelectRef.current(d.id);
         clickTimer = null;
       }, 250);
     });
-    node.on("dblclick", (_event, d) => {
+    node.on("dblclick", (event, d) => {
+      if (dragState.dragged) return;
+      event.stopPropagation();
       if (clickTimer) {
         clearTimeout(clickTimer);
         clickTimer = null;
@@ -305,7 +324,7 @@ export function GraphView({
     return () => {
       simulation.stop();
     };
-  }, [nodes, edges, scopedPath, hiddenKinds, minLines, hideTests]);
+  }, [nodes, edges, scopedPath, hiddenKinds, hiddenLanguages, minLines, hideTests]);
 
   useEffect(() => {
     const cleanup = buildSimulation();
@@ -318,18 +337,6 @@ export function GraphView({
   return (
     <div className="w-full h-full bg-black">
       <svg ref={svgRef} className="w-full h-full" />
-
-      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur border border-white/[0.07] rounded p-2 text-xs flex flex-wrap gap-3">
-        {Object.entries(KIND_COLORS).map(([kind, color]) => (
-          <div key={kind} className="flex items-center gap-1">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block"
-              style={{ backgroundColor: color }}
-            />
-            <span className="text-slate-400">{kind}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

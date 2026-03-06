@@ -3,6 +3,7 @@ export interface GraphNode {
   name: string;
   kind: string;
   file_path: string;
+  language: string;
   start_line: number;
   end_line: number;
   visibility: string | null;
@@ -31,4 +32,5 @@ export interface GraphData {
 
 export interface NodeDetail extends GraphNode {
   body: string;
+  language: string;
 }

@@ -92,6 +92,7 @@ impl CodeGraph {
                 .to_string_lossy()
                 .to_string();
 
+            let lang = parser.name().to_string();
             let file_id = rel_path.clone();
             let file_node = CodeNode {
                 id: file_id.clone(),
@@ -101,6 +102,7 @@ impl CodeGraph {
                     .unwrap_or_default(),
                 kind: NodeKind::File,
                 file_path: rel_path.clone(),
+                language: lang.clone(),
                 span: Span {
                     start_line: 1,
                     end_line: content.lines().count(),
@@ -125,6 +127,7 @@ impl CodeGraph {
             let mut child_ids = Vec::new();
             for mut node in result.nodes {
                 node.file_path = rel_path.clone();
+                node.language = lang.clone();
                 let kind_str = match node.kind {
                     NodeKind::Function => "fn",
                     NodeKind::Struct => "struct",
@@ -134,6 +137,7 @@ impl CodeGraph {
                     NodeKind::Module => "mod",
                     NodeKind::Constant => "const",
                     NodeKind::TypeAlias => "type",
+                    NodeKind::Class => "class",
                     _ => "item",
                 };
                 node.id = format!("{}::{}::{}", rel_path, kind_str, node.name);
@@ -255,6 +259,7 @@ pub struct CodeNode {
     pub name: String,
     pub kind: NodeKind,
     pub file_path: String,
+    pub language: String,
     pub span: Span,
     pub body: String,
     pub visibility: Option<String>,
@@ -274,6 +279,7 @@ pub enum NodeKind {
     Impl,
     Constant,
     TypeAlias,
+    Class,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

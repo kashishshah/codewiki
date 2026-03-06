@@ -4,11 +4,38 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
     name = "codewiki",
-    about = "Interactive codebase visualization and chat"
+    about = "Interactive codebase visualization and chat",
+    args_conflicts_with_subcommands = true
 )]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
+
+    #[command(flatten)]
+    pub default_args: DefaultArgs,
+}
+
+#[derive(clap::Args)]
+pub struct DefaultArgs {
+    /// Path to the project root (defaults to current directory)
+    #[arg(default_value = ".")]
+    pub path: PathBuf,
+
+    /// Port to serve on
+    #[arg(short, long, default_value = "3000")]
+    pub port: u16,
+
+    /// Don't open browser automatically
+    #[arg(long)]
+    pub no_open: bool,
+
+    /// Chat backend to use [default: auto-detect]
+    #[arg(long, value_enum, default_value = "auto")]
+    pub backend: Backend,
+
+    /// Model to use for chat (overrides backend default)
+    #[arg(long)]
+    pub model: Option<String>,
 }
 
 #[derive(Subcommand)]

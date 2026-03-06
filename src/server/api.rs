@@ -35,6 +35,7 @@ struct NodeResponse {
     name: String,
     kind: String,
     file_path: String,
+    language: String,
     start_line: usize,
     end_line: usize,
     visibility: Option<String>,
@@ -60,6 +61,7 @@ fn node_kind_str(kind: crate::graph::NodeKind) -> &'static str {
         crate::graph::NodeKind::Impl => "impl",
         crate::graph::NodeKind::Constant => "constant",
         crate::graph::NodeKind::TypeAlias => "type_alias",
+        crate::graph::NodeKind::Class => "class",
     }
 }
 
@@ -78,6 +80,7 @@ fn to_node_response(n: &crate::graph::CodeNode) -> NodeResponse {
         name: n.name.clone(),
         kind: node_kind_str(n.kind).to_string(),
         file_path: n.file_path.clone(),
+        language: n.language.clone(),
         start_line: n.span.start_line,
         end_line: n.span.end_line,
         visibility: n.visibility.clone(),
@@ -114,6 +117,7 @@ struct NodeDetailResponse {
     name: String,
     kind: String,
     file_path: String,
+    language: String,
     start_line: usize,
     end_line: usize,
     body: String,
@@ -133,6 +137,7 @@ async fn get_node(
         name: node.name.clone(),
         kind: node_kind_str(node.kind).to_string(),
         file_path: node.file_path.clone(),
+        language: node.language.clone(),
         start_line: node.span.start_line,
         end_line: node.span.end_line,
         body: node.body.clone(),
@@ -178,10 +183,11 @@ async fn chat_handler(
     for node_id in &req.context_node_ids {
         if let Some(node) = state.graph.nodes.get(node_id) {
             context.push_str(&format!(
-                "## {} ({}) — {}\n```rust\n{}\n```\n\n",
+                "## {} ({}) — {}\n```{}\n{}\n```\n\n",
                 node.name,
                 node_kind_str(node.kind),
                 node.file_path,
+                node.language,
                 node.body
             ));
         }

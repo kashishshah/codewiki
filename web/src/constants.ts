@@ -8,6 +8,7 @@ export const KIND_COLORS: Record<string, string> = {
   file: "#5a6370",
   constant: "#c47d5a",
   type_alias: "#6b9e91",
+  class: "#b5a06b",
 };
 
 export const EDGE_COLORS: Record<string, string> = {
@@ -26,4 +27,5 @@ export const FILTERABLE_KINDS = [
   "module",
   "constant",
   "type_alias",
+  "class",
 ];

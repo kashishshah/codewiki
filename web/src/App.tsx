@@ -3,7 +3,7 @@ import { useGraph, useNodeDetail } from "./hooks/useGraph";
 import { useChat } from "./hooks/useChat";
 import { searchNodes } from "./api";
 import { KIND_COLORS, FILTERABLE_KINDS } from "./constants";
-import type { GraphEdge } from "./types";
+import type { GraphEdge, GraphNode } from "./types";
 import { FileTree } from "./components/FileTree";
 import { GraphView } from "./components/GraphView";
 import { CodePanel } from "./components/CodePanel";
@@ -19,8 +19,10 @@ function App() {
   const [chatOpen, setChatOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [codePanelOpen, setCodePanelOpen] = useState(true);
+  const [codePanelExpanded, setCodePanelExpanded] = useState(false);
   const [scopedPath, setScopedFilePath] = useState<string | null>(null);
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
+  const [hiddenLanguages, setHiddenLanguages] = useState<Set<string>>(new Set());
   const [minLines, setMinLines] = useState(0);
   const [hideTests, setHideTests] = useState(true);
   const { detail } = useNodeDetail(selectedNodeId);
@@ -44,6 +46,19 @@ function App() {
       return next;
     });
   };
+
+  const toggleLanguage = (lang: string) => {
+    setHiddenLanguages((prev) => {
+      const next = new Set(prev);
+      if (next.has(lang)) next.delete(lang);
+      else next.add(lang);
+      return next;
+    });
+  };
+
+  const detectedLanguages = data
+    ? [...new Set(data.nodes.map((n: GraphNode) => n.language).filter(Boolean))]
+    : [];
 
   const addScopedWithDependencies = () => {
     if (!scopedPath || !data) return;
@@ -92,6 +107,7 @@ function App() {
           contextNodeIds={contextNodeIds}
           scopedPath={scopedPath}
           hiddenKinds={hiddenKinds}
+          hiddenLanguages={hiddenLanguages}
           minLines={minLines}
           hideTests={hideTests}
           onSelectNode={handleSelectNode}
@@ -131,15 +147,18 @@ function App() {
           )}
         </div>
 
-        {/* Search bar + scope chip overlay */}
+        {/* Search bar + scope chip + legend overlay */}
         <div
           className="absolute top-3 z-20 flex flex-col gap-2"
-          style={{ left: sidebarOpen ? "17.5rem" : "3.5rem", maxWidth: "24rem" }}
+          style={{ left: sidebarOpen ? "17.5rem" : "3.5rem", maxWidth: "32rem" }}
         >
           <SearchBar
             onSelect={handleSelectNode}
             hiddenKinds={hiddenKinds}
             onToggleKind={toggleKind}
+            hiddenLanguages={hiddenLanguages}
+            onToggleLanguage={toggleLanguage}
+            detectedLanguages={detectedLanguages}
             minLines={minLines}
             onMinLinesChange={setMinLines}
             hideTests={hideTests}
@@ -165,20 +184,41 @@ function App() {
               </button>
             </div>
           )}
+          <div className="bg-black/60 backdrop-blur border border-white/[0.07] rounded p-2 text-xs flex flex-wrap gap-3">
+            {Object.entries(KIND_COLORS).map(([kind, color]) => (
+              <div key={kind} className="flex items-center gap-1">
+                <span
+                  className="w-2.5 h-2.5 rounded-full inline-block"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-slate-400">{kind}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Code panel overlay — transparent */}
         {selectedNodeId && (
           <div
-            className={`absolute right-0 top-0 bottom-0 z-10 flex flex-col transition-all ${
-              codePanelOpen ? "w-[32rem]" : "w-10"
-            } bg-black/50 backdrop-blur-xl border-l border-white/[0.08]`}
+            className="absolute right-0 top-0 bottom-0 z-10 flex flex-col transition-all bg-black/50 backdrop-blur-xl border-l border-white/[0.08]"
+            style={{
+              width: codePanelOpen ? (codePanelExpanded ? "calc(100% - 3rem)" : "32rem") : "2.5rem",
+            }}
           >
             <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
               {codePanelOpen && (
-                <span className="text-sm font-semibold text-slate-300 truncate px-1">
-                  {detail?.name || "Code"}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm font-semibold text-slate-300 truncate px-1">
+                    {detail?.name || "Code"}
+                  </span>
+                  <button
+                    onClick={() => setCodePanelExpanded(!codePanelExpanded)}
+                    className="p-1 text-slate-500 hover:text-slate-200 text-xs shrink-0"
+                    title={codePanelExpanded ? "Shrink panel" : "Expand to full screen"}
+                  >
+                    {codePanelExpanded ? "\u2596" : "\u2588"}
+                  </button>
+                </div>
               )}
               <button
                 onClick={() => setCodePanelOpen(!codePanelOpen)}
@@ -201,10 +241,13 @@ function App() {
           </div>
         )}
 
-        {/* Chat overlay — floating at bottom-right */}
+        {/* Chat overlay — floating at bottom-left, clear of sidebar */}
         <div
-          className="absolute bottom-4 right-4 z-30"
-          style={{ width: chatOpen ? "36rem" : "auto" }}
+          className="absolute bottom-4 z-30"
+          style={{
+            left: sidebarOpen ? "17.5rem" : "3.5rem",
+            width: chatOpen ? "36rem" : "auto",
+          }}
         >
           {chatOpen ? (
             <div className="bg-black/60 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
@@ -242,6 +285,9 @@ function SearchBar({
   onSelect,
   hiddenKinds,
   onToggleKind,
+  hiddenLanguages,
+  onToggleLanguage,
+  detectedLanguages,
   minLines,
   onMinLinesChange,
   hideTests,
@@ -250,6 +296,9 @@ function SearchBar({
   onSelect: (id: string) => void;
   hiddenKinds: Set<string>;
   onToggleKind: (kind: string) => void;
+  hiddenLanguages: Set<string>;
+  onToggleLanguage: (lang: string) => void;
+  detectedLanguages: string[];
   minLines: number;
   onMinLinesChange: (v: number) => void;
   hideTests: boolean;
@@ -322,7 +371,9 @@ function SearchBar({
         <button
           onClick={() => setFilterOpen((prev) => !prev)}
           className={`px-3 py-1.5 bg-black/40 backdrop-blur-xl border rounded-full text-sm text-slate-400 hover:text-slate-200 transition-colors ${
-            hiddenKinds.size > 0 || minLines > 0 ? "border-blue-500/50" : "border-white/[0.1]"
+            hiddenKinds.size > 0 || hiddenLanguages.size > 0 || minLines > 0
+              ? "border-blue-500/50"
+              : "border-white/[0.1]"
           }`}
           title="Filter node kinds"
         >
@@ -358,6 +409,34 @@ function SearchBar({
                 </label>
               );
             })}
+            {detectedLanguages.length > 1 && (
+              <div className="border-t border-white/[0.06] mt-1.5 pt-2 px-2">
+                <span className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 block">
+                  Languages
+                </span>
+                {detectedLanguages.map((lang) => {
+                  const hidden = hiddenLanguages.has(lang);
+                  return (
+                    <label
+                      key={lang}
+                      className="flex items-center gap-2 px-0 py-1 hover:bg-white/[0.05] rounded cursor-pointer text-xs"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!hidden}
+                        onChange={() => onToggleLanguage(lang)}
+                        className="accent-blue-500"
+                      />
+                      <span
+                        className={`text-slate-300 capitalize ${hidden ? "line-through opacity-50" : ""}`}
+                      >
+                        {lang}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             <div className="border-t border-white/[0.06] mt-1.5 pt-2 px-2 space-y-2">
               <label className="flex items-center gap-2 py-0.5 cursor-pointer text-xs">
                 <input
