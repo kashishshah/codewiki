@@ -5,7 +5,7 @@ import python from "highlight.js/lib/languages/python";
 import elixir from "highlight.js/lib/languages/elixir";
 import "highlight.js/styles/atom-one-dark.css";
 import type { NodeDetail } from "../types";
-import { KindBadge } from "../App";
+import { KindBadge } from "./KindBadge";
 
 hljs.registerLanguage("rust", rust);
 hljs.registerLanguage("python", python);

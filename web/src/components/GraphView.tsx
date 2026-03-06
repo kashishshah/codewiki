@@ -117,9 +117,9 @@ export function GraphView({
 
     const computeRadius = (node: GraphNode) => {
       const lines = Math.max(1, node.end_line - node.start_line || 1);
-      const lineRadius = 5 + Math.sqrt(Math.min(lines, 200) / 200) * 11;
+      const lineRadius = 8 + Math.sqrt(Math.min(lines, 200) / 200) * 16;
       const connections = edgeCount.get(node.id) || 0;
-      const connectBonus = Math.min(connections * 0.5, 6);
+      const connectBonus = Math.min(connections * 0.8, 8);
       return lineRadius + connectBonus;
     };
 
@@ -137,9 +137,9 @@ export function GraphView({
     }));
 
     const n = simNodes.length;
-    const chargeStrength = n > 200 ? -400 : n > 50 ? -300 : -200;
-    const linkDist = n > 200 ? 150 : n > 50 ? 100 : 80;
-    const collisionRadius = n > 200 ? 15 : 25;
+    const chargeStrength = n > 200 ? -150 : n > 50 ? -120 : -80;
+    const linkDist = n > 200 ? 80 : n > 50 ? 60 : 45;
+    const collisionRadius = n > 200 ? 8 : 12;
 
     // Pre-compute layout silently so nodes don't visibly jitter on load
     const simulation = d3

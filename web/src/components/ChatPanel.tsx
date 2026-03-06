@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import type { GraphNode } from "../types";
+import { ExpandIcon, ShrinkIcon } from "./Icons";
 
 interface ChatPanelProps {
   chat: {
@@ -11,6 +12,8 @@ interface ChatPanelProps {
   contextNodeIds: string[];
   nodes: GraphNode[];
   cliBackend: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
   onRemoveContext: (id: string) => void;
   onClearContext: () => void;
   onClose: () => void;
@@ -21,6 +24,8 @@ export function ChatPanel({
   contextNodeIds,
   nodes,
   cliBackend,
+  expanded,
+  onToggleExpand,
   onRemoveContext,
   onClearContext,
   onClose,
@@ -46,7 +51,7 @@ export function ChatPanel({
     .filter(Boolean) as GraphNode[];
 
   return (
-    <div className="flex flex-col h-[28rem]">
+    <div className={`flex flex-col ${expanded ? "h-full" : "h-[28rem]"}`}>
       {/* Header */}
       <div className="px-4 py-2.5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -61,13 +66,22 @@ export function ChatPanel({
             </button>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="w-6 h-6 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors text-xs"
-          title="Close chat"
-        >
-          {"\u2715"}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleExpand}
+            className="w-6 h-6 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors"
+            title={expanded ? "Shrink chat" : "Expand chat"}
+          >
+            {expanded ? <ShrinkIcon /> : <ExpandIcon />}
+          </button>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors text-xs"
+            title="Close chat"
+          >
+            {"\u2715"}
+          </button>
+        </div>
       </div>
 
       {/* Context chips */}

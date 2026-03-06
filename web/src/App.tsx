@@ -1,27 +1,30 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useGraph, useNodeDetail } from "./hooks/useGraph";
 import { useChat } from "./hooks/useChat";
-import { searchNodes, fetchConfig } from "./api";
+import { fetchConfig } from "./api";
 import type { AppConfig } from "./api";
-import { KIND_COLORS, FILTERABLE_KINDS } from "./constants";
+import { KIND_COLORS } from "./constants";
 import type { GraphEdge, GraphNode } from "./types";
 import { FileTree } from "./components/FileTree";
 import { GraphView } from "./components/GraphView";
 import { CodePanel } from "./components/CodePanel";
 import { ChatPanel } from "./components/ChatPanel";
-
-const DEFAULT_HIDDEN = new Set(FILTERABLE_KINDS.filter((k) => k !== "function"));
+import { SearchBar } from "./components/SearchBar";
+import { ChevronLeft, ChevronRight, ExpandIcon, ShrinkIcon, ChatIcon } from "./components/Icons";
 
 function App() {
   const { data, loading, error } = useGraph();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [contextNodeIds, setContextNodeIds] = useState<string[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatExpanded, setChatExpanded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [codePanelOpen, setCodePanelOpen] = useState(true);
   const [codePanelExpanded, setCodePanelExpanded] = useState(false);
   const [scopedPath, setScopedFilePath] = useState<string | null>(null);
-  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
+  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(
+    new Set(["struct", "enum", "trait", "impl", "module", "constant", "type_alias", "class"]),
+  );
   const [hiddenLanguages, setHiddenLanguages] = useState<Set<string>>(new Set());
   const [minLines, setMinLines] = useState(10);
   const [hideTests, setHideTests] = useState(true);
@@ -34,10 +37,6 @@ function App() {
       .then(setConfig)
       .catch(() => setConfig({ cli_backend: false }));
   }, []);
-
-  const handleSelectNode = (id: string) => {
-    setSelectedNodeId(id);
-  };
 
   const toggleContext = (id: string) => {
     setContextNodeIds((prev) =>
@@ -86,10 +85,66 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-slate-400">
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-          <p>Indexing codebase...</p>
+          <svg width="48" height="48" viewBox="0 0 48 48" className="mx-auto mb-5">
+            <g fill="none" strokeWidth="1.5" strokeLinecap="round">
+              <circle cx="16" cy="16" r="4" stroke="#6b8db5" opacity="0.6">
+                <animate
+                  attributeName="opacity"
+                  values="0.6;1;0.6"
+                  dur="2s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              <circle cx="34" cy="14" r="3" stroke="#7ba386" opacity="0.6">
+                <animate
+                  attributeName="opacity"
+                  values="0.6;1;0.6"
+                  dur="2s"
+                  begin="0.3s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              <circle cx="26" cy="34" r="3.5" stroke="#9882b5" opacity="0.6">
+                <animate
+                  attributeName="opacity"
+                  values="0.6;1;0.6"
+                  dur="2s"
+                  begin="0.6s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+              <line x1="20" y1="16" x2="31" y2="14" stroke="#6b8db5" opacity="0.25">
+                <animate
+                  attributeName="opacity"
+                  values="0.25;0.5;0.25"
+                  dur="2s"
+                  begin="0.15s"
+                  repeatCount="indefinite"
+                />
+              </line>
+              <line x1="18" y1="19" x2="24" y2="31" stroke="#9882b5" opacity="0.25">
+                <animate
+                  attributeName="opacity"
+                  values="0.25;0.5;0.25"
+                  dur="2s"
+                  begin="0.45s"
+                  repeatCount="indefinite"
+                />
+              </line>
+              <line x1="33" y1="17" x2="28" y2="31" stroke="#7ba386" opacity="0.25">
+                <animate
+                  attributeName="opacity"
+                  values="0.25;0.5;0.25"
+                  dur="2s"
+                  begin="0.75s"
+                  repeatCount="indefinite"
+                />
+              </line>
+            </g>
+          </svg>
+          <p className="text-sm text-slate-500 tracking-wide">Indexing codebase</p>
         </div>
       </div>
     );
@@ -106,7 +161,6 @@ function App() {
   return (
     <div className="flex flex-col h-screen">
       <div className="flex-1 relative min-h-0">
-        {/* Graph fills the entire area */}
         <GraphView
           nodes={data.nodes}
           edges={data.edges}
@@ -117,28 +171,27 @@ function App() {
           hiddenLanguages={hiddenLanguages}
           minLines={minLines}
           hideTests={hideTests}
-          onSelectNode={handleSelectNode}
+          onSelectNode={setSelectedNodeId}
           onToggleContext={toggleContext}
         />
 
-        {/* Sidebar overlay — transparent */}
+        {/* Sidebar */}
         <div
-          className={`absolute left-0 top-0 bottom-0 z-10 flex flex-col transition-all ${
-            sidebarOpen ? "w-64" : "w-10"
-          } bg-black/50 backdrop-blur-xl border-r border-white/[0.08]`}
+          className="absolute left-0 top-0 bottom-0 z-10 flex flex-col panel-transition bg-black/50 backdrop-blur-xl border-r border-white/[0.08]"
+          style={{ width: sidebarOpen ? "16rem" : "2.5rem" }}
         >
           <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
             {sidebarOpen && (
-              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider px-1">
+              <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider px-1">
                 Files
               </h2>
             )}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1 text-slate-400 hover:text-slate-200 text-sm"
+              className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors"
               title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
             >
-              {sidebarOpen ? "\u25C0" : "\u25B6"}
+              {sidebarOpen ? <ChevronLeft /> : <ChevronRight />}
             </button>
           </div>
           {sidebarOpen && (
@@ -154,16 +207,18 @@ function App() {
           )}
         </div>
 
-        {/* Search bar + scope chip + legend overlay */}
+        {/* Search + scope */}
         <div
-          className="absolute top-3 z-20 flex flex-col gap-2"
+          className="absolute top-3 z-20 flex flex-col gap-2 panel-transition"
           style={{
             left: sidebarOpen ? "17.5rem" : "3.5rem",
-            maxWidth: "32rem",
+            right:
+              selectedNodeId && codePanelOpen ? (codePanelExpanded ? "1rem" : "33rem") : "1rem",
+            maxWidth: "42rem",
           }}
         >
           <SearchBar
-            onSelect={handleSelectNode}
+            onSelect={setSelectedNodeId}
             hiddenKinds={hiddenKinds}
             onToggleKind={toggleKind}
             hiddenLanguages={hiddenLanguages}
@@ -194,23 +249,36 @@ function App() {
               </button>
             </div>
           )}
-          <div className="bg-black/60 backdrop-blur border border-white/[0.07] rounded p-2 text-xs flex flex-wrap gap-3">
+        </div>
+
+        {/* Legend */}
+        <div
+          className="absolute bottom-3 z-10 panel-transition"
+          style={{
+            right:
+              selectedNodeId && codePanelOpen ? (codePanelExpanded ? "auto" : "33rem") : "1rem",
+          }}
+        >
+          <div className="flex items-center gap-3 px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded-full border border-white/[0.05]">
             {Object.entries(KIND_COLORS).map(([kind, color]) => (
               <div key={kind} className="flex items-center gap-1">
                 <span
-                  className="w-2.5 h-2.5 rounded-full inline-block"
-                  style={{ backgroundColor: color }}
+                  className="w-2 h-2 rounded-full inline-block"
+                  style={{
+                    backgroundColor: color,
+                    boxShadow: `0 0 4px ${color}40`,
+                  }}
                 />
-                <span className="text-slate-400">{kind}</span>
+                <span className="text-[10px] text-slate-600">{kind}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Code panel overlay — transparent */}
+        {/* Code panel */}
         {selectedNodeId && (
           <div
-            className={`absolute right-0 top-0 bottom-0 flex flex-col transition-all bg-black/50 backdrop-blur-xl border-l border-white/[0.08] ${codePanelExpanded ? "z-40" : "z-10"}`}
+            className={`absolute right-0 top-0 bottom-0 flex flex-col panel-transition bg-black/50 backdrop-blur-xl border-l border-white/[0.08] ${codePanelExpanded ? "z-40" : "z-10"}`}
             style={{
               width: codePanelOpen
                 ? codePanelExpanded
@@ -222,7 +290,7 @@ function App() {
             <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
               {codePanelOpen && (
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-sm font-semibold text-slate-300 truncate px-1">
+                  <span className="text-sm font-medium text-slate-300 truncate px-1">
                     {detail?.name || "Code"}
                   </span>
                   <button
@@ -230,44 +298,16 @@ function App() {
                     className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors shrink-0"
                     title={codePanelExpanded ? "Shrink panel" : "Expand to full screen"}
                   >
-                    {codePanelExpanded ? (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      >
-                        <polyline points="9,1 13,1 13,5" />
-                        <polyline points="5,13 1,13 1,9" />
-                        <line x1="13" y1="1" x2="8" y2="6" />
-                        <line x1="1" y1="13" x2="6" y2="8" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      >
-                        <polyline points="1,5 1,1 5,1" />
-                        <polyline points="13,9 13,13 9,13" />
-                        <line x1="1" y1="1" x2="6" y2="6" />
-                        <line x1="13" y1="13" x2="8" y2="8" />
-                      </svg>
-                    )}
+                    {codePanelExpanded ? <ShrinkIcon /> : <ExpandIcon />}
                   </button>
                 </div>
               )}
               <button
                 onClick={() => setCodePanelOpen(!codePanelOpen)}
-                className="p-1 text-slate-400 hover:text-slate-200 text-sm"
+                className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors"
                 title={codePanelOpen ? "Collapse panel" : "Expand panel"}
               >
-                {codePanelOpen ? "\u25B6" : "\u25C0"}
+                {codePanelOpen ? <ChevronRight /> : <ChevronLeft />}
               </button>
             </div>
             {codePanelOpen && (
@@ -283,26 +323,45 @@ function App() {
           </div>
         )}
 
-        {/* Chat overlay — floating at bottom-left, always above expanded code panel */}
+        {/* Chat */}
         <div
-          className="absolute bottom-4 z-50"
-          style={{
-            left: sidebarOpen ? "17.5rem" : "3.5rem",
-            width: chatOpen ? "36rem" : "auto",
-          }}
+          className="absolute z-50 transition-all duration-200"
+          style={
+            chatOpen && chatExpanded
+              ? {
+                  left: sidebarOpen ? "16rem" : "2.5rem",
+                  right: selectedNodeId && codePanelOpen && !codePanelExpanded ? "32rem" : "0",
+                  top: "0",
+                  bottom: "0",
+                }
+              : {
+                  left: sidebarOpen ? "17.5rem" : "3.5rem",
+                  bottom: "1rem",
+                  width: chatOpen ? "36rem" : "auto",
+                }
+          }
         >
           {chatOpen ? (
-            <div className="bg-black/60 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div
+              className={`bg-black/60 backdrop-blur-2xl border border-white/[0.1] shadow-2xl shadow-black/50 overflow-hidden ${
+                chatExpanded ? "h-full rounded-none border-l" : "rounded-2xl"
+              }`}
+            >
               <ChatPanel
                 chat={chat}
                 contextNodeIds={contextNodeIds}
                 nodes={data.nodes}
                 cliBackend={config?.cli_backend ?? false}
+                expanded={chatExpanded}
+                onToggleExpand={() => setChatExpanded((v) => !v)}
                 onRemoveContext={(id) =>
                   setContextNodeIds((prev) => prev.filter((nodeId) => nodeId !== id))
                 }
                 onClearContext={() => setContextNodeIds([])}
-                onClose={() => setChatOpen(false)}
+                onClose={() => {
+                  setChatOpen(false);
+                  setChatExpanded(false);
+                }}
               />
             </div>
           ) : (
@@ -310,6 +369,7 @@ function App() {
               onClick={() => setChatOpen(true)}
               className="px-4 py-2 flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 bg-black/50 backdrop-blur-xl border border-white/[0.1] rounded-full shadow-lg shadow-black/30 hover:bg-black/70 transition-colors"
             >
+              <ChatIcon />
               <span>Chat</span>
               {contextNodeIds.length > 0 ? (
                 <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/25 rounded-full text-xs text-cyan-400">
@@ -323,212 +383,6 @@ function App() {
         </div>
       </div>
     </div>
-  );
-}
-
-function SearchBar({
-  onSelect,
-  hiddenKinds,
-  onToggleKind,
-  hiddenLanguages,
-  onToggleLanguage,
-  detectedLanguages,
-  minLines,
-  onMinLinesChange,
-  hideTests,
-  onToggleHideTests,
-}: {
-  onSelect: (id: string) => void;
-  hiddenKinds: Set<string>;
-  onToggleKind: (kind: string) => void;
-  hiddenLanguages: Set<string>;
-  onToggleLanguage: (lang: string) => void;
-  detectedLanguages: string[];
-  minLines: number;
-  onMinLinesChange: (v: number) => void;
-  hideTests: boolean;
-  onToggleHideTests: () => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<{ id: string; name: string; kind: string }[]>([]);
-  const [open, setOpen] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-    const handler = (e: PointerEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
-        setFilterOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", handler, true);
-    return () => window.removeEventListener("pointerdown", handler, true);
-  }, [filterOpen]);
-
-  const handleSearch = async (q: string) => {
-    setQuery(q);
-    if (q.length < 2) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
-    try {
-      const nodes = await searchNodes(q);
-      setResults(nodes.slice(0, 10));
-      setOpen(true);
-    } catch {
-      setResults([]);
-    }
-  };
-
-  return (
-    <div className="flex gap-2">
-      <div className="flex-1 relative">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleSearch(e.target.value)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder="Search symbols..."
-          className="w-full px-3 py-1.5 bg-black/40 backdrop-blur-xl border border-white/[0.1] rounded-full text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-        />
-        {open && results.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-black/80 backdrop-blur-xl border border-white/[0.07] rounded shadow-lg z-50 max-h-60 overflow-y-auto">
-            {results.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => {
-                  onSelect(r.id);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className="w-full text-left px-3 py-2 hover:bg-white/[0.05] text-sm flex items-center gap-2"
-              >
-                <KindBadge kind={r.kind} />
-                <span className="text-slate-200">{r.name}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="relative" ref={filterRef}>
-        <button
-          onClick={() => setFilterOpen((prev) => !prev)}
-          className={`px-3 py-1.5 bg-black/40 backdrop-blur-xl border rounded-full text-sm text-slate-400 hover:text-slate-200 transition-colors ${
-            hiddenKinds.size > 0 || hiddenLanguages.size > 0 || minLines > 0
-              ? "border-blue-500/50"
-              : "border-white/[0.1]"
-          }`}
-          title="Filter node kinds"
-        >
-          <span className="flex items-center gap-1.5">
-            Filter
-            {hiddenKinds.size > 0 && (
-              <span className="text-xs text-blue-400">{hiddenKinds.size}</span>
-            )}
-          </span>
-        </button>
-        {filterOpen && (
-          <div className="absolute top-full right-0 mt-1 bg-black/80 backdrop-blur-xl border border-white/[0.07] rounded-lg shadow-lg z-50 p-2 min-w-[200px]">
-            {FILTERABLE_KINDS.map((kind) => {
-              const hidden = hiddenKinds.has(kind);
-              return (
-                <label
-                  key={kind}
-                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-white/[0.05] rounded cursor-pointer text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={!hidden}
-                    onChange={() => onToggleKind(kind)}
-                    className="accent-blue-500"
-                  />
-                  <span
-                    className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                    style={{ backgroundColor: KIND_COLORS[kind] }}
-                  />
-                  <span className={`text-slate-300 ${hidden ? "line-through opacity-50" : ""}`}>
-                    {kind}
-                  </span>
-                </label>
-              );
-            })}
-            {detectedLanguages.length > 1 && (
-              <div className="border-t border-white/[0.06] mt-1.5 pt-2 px-2">
-                <span className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 block">
-                  Languages
-                </span>
-                {detectedLanguages.map((lang) => {
-                  const hidden = hiddenLanguages.has(lang);
-                  return (
-                    <label
-                      key={lang}
-                      className="flex items-center gap-2 px-0 py-1 hover:bg-white/[0.05] rounded cursor-pointer text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!hidden}
-                        onChange={() => onToggleLanguage(lang)}
-                        className="accent-blue-500"
-                      />
-                      <span
-                        className={`text-slate-300 capitalize ${hidden ? "line-through opacity-50" : ""}`}
-                      >
-                        {lang}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            <div className="border-t border-white/[0.06] mt-1.5 pt-2 px-2 space-y-2">
-              <label className="flex items-center gap-2 py-0.5 cursor-pointer text-xs">
-                <input
-                  type="checkbox"
-                  checked={hideTests}
-                  onChange={onToggleHideTests}
-                  className="accent-blue-500"
-                />
-                <span className="text-slate-300">Hide tests</span>
-              </label>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Min lines
-                  </span>
-                  <span className="text-xs text-slate-400 tabular-nums">{minLines}</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={50}
-                  step={5}
-                  value={minLines}
-                  onChange={(e) => onMinLinesChange(Number(e.target.value))}
-                  className="w-full h-1 accent-blue-500 cursor-pointer"
-                />
-                <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
-                  <span>0</span>
-                  <span>50+</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function KindBadge({ kind }: { kind: string }) {
-  return (
-    <span
-      className="inline-block px-1.5 py-0.5 rounded text-xs font-mono"
-      style={{ backgroundColor: KIND_COLORS[kind] || "#78909c", color: "#fff" }}
-    >
-      {kind.charAt(0).toUpperCase()}
-    </span>
   );
 }
 
