@@ -38,10 +38,15 @@ impl CodeGraph {
     }
 
     pub fn search(&self, query: &str) -> Vec<&CodeNode> {
-        let q = query.to_lowercase();
+        let q = query.as_bytes();
         self.nodes
             .values()
-            .filter(|n| n.name.to_lowercase().contains(&q))
+            .filter(|n| {
+                n.name
+                    .as_bytes()
+                    .windows(q.len())
+                    .any(|w| w.eq_ignore_ascii_case(q))
+            })
             .collect()
     }
 

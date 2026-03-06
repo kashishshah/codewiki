@@ -273,7 +273,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "streaming-iterator",
  "tokio",
  "tokio-stream",
  "tower",

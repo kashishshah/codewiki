@@ -19,19 +19,16 @@ export function useGraph() {
 
 export function useNodeDetail(nodeId: string | null) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!nodeId) {
       setDetail(null);
       return;
     }
-    setLoading(true);
     fetchNode(nodeId)
       .then(setDetail)
-      .catch(() => setDetail(null))
-      .finally(() => setLoading(false));
+      .catch(() => setDetail(null));
   }, [nodeId]);
 
-  return { detail, loading };
+  return { detail };
 }

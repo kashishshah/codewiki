@@ -64,12 +64,14 @@ pub enum Command {
 
 #[derive(Clone, ValueEnum)]
 pub enum Backend {
-    /// Auto-detect: OPENAI_API_BASE → ANTHROPIC_API_KEY → claude CLI
+    /// Auto-detect: OPENAI_API_BASE → ANTHROPIC_API_KEY → claude CLI → codex CLI
     Auto,
     /// Anthropic Messages API (requires ANTHROPIC_API_KEY)
     ClaudeApi,
     /// Claude CLI binary (supports session reuse)
     ClaudeCli,
+    /// Codex CLI binary (supports session reuse)
+    CodexCli,
     /// OpenAI-compatible API (requires OPENAI_API_BASE)
     Openai,
 }

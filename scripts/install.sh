@@ -60,8 +60,13 @@ if command -v claude >/dev/null 2>&1; then
     CHAT_OK=1
 fi
 
+if command -v codex >/dev/null 2>&1; then
+    ok "codex CLI found"
+    CHAT_OK=1
+fi
+
 if [ $CHAT_OK -eq 0 ]; then
-    warn "no chat backend detected — set ANTHROPIC_API_KEY, OPENAI_API_BASE, or install Claude CLI for chat support"
+    warn "no chat backend detected — set ANTHROPIC_API_KEY, OPENAI_API_BASE, or install Claude/Codex CLI for chat support"
 fi
 
 echo ""

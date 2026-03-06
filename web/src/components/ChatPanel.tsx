@@ -5,9 +5,7 @@ import type { GraphNode } from "../types";
 interface ChatPanelProps {
   chat: {
     messages: { role: string; content: string }[];
-    streaming: boolean;
     sendMessage: (text: string, contextNodeIds: string[]) => void;
-    cancel: () => void;
     clear: () => void;
   };
   contextNodeIds: string[];
@@ -163,25 +161,15 @@ export function ChatPanel({
                   : "Ask anything about the codebase..."
             }
             className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 focus:outline-none py-1"
-            disabled={chat.streaming || needsContext}
+            disabled={needsContext}
           />
-          {chat.streaming ? (
-            <button
-              type="button"
-              onClick={chat.cancel}
-              className="px-3 py-1 bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg text-xs hover:bg-red-500/30 transition-colors"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              type="submit"
-              className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-30"
-              disabled={!input.trim() || needsContext}
-            >
-              Send
-            </button>
-          )}
+          <button
+            type="submit"
+            className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-30"
+            disabled={!input.trim() || needsContext}
+          >
+            Send
+          </button>
         </div>
       </form>
     </div>

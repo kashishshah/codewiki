@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::Path;
-use streaming_iterator::StreamingIterator;
-use tree_sitter::{Parser, Query, QueryCursor};
+use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 
 use crate::graph::{CodeNode, NodeKind, Span};
 
@@ -59,7 +58,6 @@ impl LanguageParser for PythonParser {
 
         while let Some(m) = matches.next() {
             match m.pattern_index {
-                // function_definition
                 0 => {
                     let (name, _) = extract_capture(m, capture_names, "fn_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "function", content);
@@ -78,7 +76,6 @@ impl LanguageParser for PythonParser {
                         });
                     }
                 }
-                // class_definition
                 1 => {
                     let (name, _) = extract_capture(m, capture_names, "class_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "class_def", content);
@@ -97,7 +94,6 @@ impl LanguageParser for PythonParser {
                         });
                     }
                 }
-                // import_statement
                 2 => {
                     let (import_path, _) =
                         extract_capture(m, capture_names, "import_path", content);
@@ -105,7 +101,6 @@ impl LanguageParser for PythonParser {
                         imports.push(path);
                     }
                 }
-                // import_from_statement
                 3 => {
                     let (import_path, _) =
                         extract_capture(m, capture_names, "import_path", content);
@@ -113,7 +108,6 @@ impl LanguageParser for PythonParser {
                         imports.push(path);
                     }
                 }
-                // call expression
                 4 => {
                     let (call_name, _) = extract_capture(m, capture_names, "call_name", content);
                     if let Some(call_name) = call_name {
@@ -130,7 +124,6 @@ impl LanguageParser for PythonParser {
                         }
                     }
                 }
-                // method call
                 5 => {
                     let (method_name, _) =
                         extract_capture(m, capture_names, "method_name", content);

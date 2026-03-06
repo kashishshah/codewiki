@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::Path;
-use streaming_iterator::StreamingIterator;
-use tree_sitter::{Parser, Query, QueryCursor};
+use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 
 use crate::graph::{CodeNode, NodeKind, Span};
 
@@ -59,7 +58,6 @@ impl LanguageParser for ElixirParser {
 
         while let Some(m) = matches.next() {
             match m.pattern_index {
-                // defmodule
                 0 => {
                     let (name, _) = extract_capture(m, capture_names, "module_name", content);
                     let (body, body_span) =
@@ -79,7 +77,6 @@ impl LanguageParser for ElixirParser {
                         });
                     }
                 }
-                // def/defp (call-style args)
                 1 => {
                     let (keyword, _) = extract_capture(m, capture_names, "keyword", content);
                     let (name, _) = extract_capture(m, capture_names, "fn_name", content);
@@ -104,7 +101,6 @@ impl LanguageParser for ElixirParser {
                         });
                     }
                 }
-                // def/defp (simple identifier — no-arg functions)
                 2 => {
                     let (keyword, _) = extract_capture(m, capture_names, "keyword", content);
                     let (name, _) = extract_capture(m, capture_names, "fn_name_simple", content);
@@ -129,7 +125,6 @@ impl LanguageParser for ElixirParser {
                         });
                     }
                 }
-                // defprotocol
                 3 => {
                     let (name, _) = extract_capture(m, capture_names, "protocol_name", content);
                     let (body, body_span) =
@@ -149,7 +144,6 @@ impl LanguageParser for ElixirParser {
                         });
                     }
                 }
-                // defimpl
                 4 => {
                     let (name, _) = extract_capture(m, capture_names, "impl_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "impl_def", content);
@@ -168,7 +162,6 @@ impl LanguageParser for ElixirParser {
                         });
                     }
                 }
-                // use/import/alias
                 5 => {
                     let (import_path, _) =
                         extract_capture(m, capture_names, "import_path", content);
@@ -176,11 +169,9 @@ impl LanguageParser for ElixirParser {
                         imports.push(path);
                     }
                 }
-                // general call (pattern 6) — skip def/defmodule/etc keywords
                 6 => {
                     let (call_name, _) = extract_capture(m, capture_names, "call_name", content);
                     if let Some(ref name) = call_name {
-                        // Skip Elixir keywords that are parsed as calls
                         if matches!(
                             name.as_str(),
                             "defmodule"

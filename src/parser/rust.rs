@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::Path;
-use streaming_iterator::StreamingIterator;
-use tree_sitter::{Parser, Query, QueryCursor};
+use tree_sitter::{Parser, Query, QueryCursor, StreamingIterator};
 
 use crate::graph::{CodeNode, NodeKind, Span};
 
@@ -62,7 +61,6 @@ impl LanguageParser for RustParser {
             let pattern_idx = m.pattern_index;
 
             match pattern_idx {
-                // function_item
                 0 => {
                     let (name, _) = extract_capture(m, capture_names, "fn_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "function", content);
@@ -82,7 +80,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // struct_item
                 1 => {
                     let (name, _) = extract_capture(m, capture_names, "struct_name", content);
                     let (body, body_span) =
@@ -103,7 +100,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // enum_item
                 2 => {
                     let (name, _) = extract_capture(m, capture_names, "enum_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "enum_def", content);
@@ -123,7 +119,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // trait_item
                 3 => {
                     let (name, _) = extract_capture(m, capture_names, "trait_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "trait_def", content);
@@ -143,7 +138,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // impl_item
                 4 => {
                     let (impl_type, _) = extract_capture(m, capture_names, "impl_type", content);
                     let (body, body_span) = extract_capture(m, capture_names, "impl_def", content);
@@ -164,14 +158,12 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // use_declaration
                 5 => {
                     let (use_path, _) = extract_capture(m, capture_names, "use_path", content);
                     if let Some(use_path) = use_path {
                         imports.push(use_path);
                     }
                 }
-                // call_expression (simple function call)
                 6 => {
                     let (call_name, _) = extract_capture(m, capture_names, "call_name", content);
                     if let Some(call_name) = call_name {
@@ -188,7 +180,6 @@ impl LanguageParser for RustParser {
                         }
                     }
                 }
-                // method_call
                 7 => {
                     let (method_name, _) =
                         extract_capture(m, capture_names, "method_name", content);
@@ -206,7 +197,6 @@ impl LanguageParser for RustParser {
                         }
                     }
                 }
-                // mod_item
                 8 => {
                     let (name, _) = extract_capture(m, capture_names, "mod_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "mod_def", content);
@@ -226,7 +216,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // const_item
                 9 => {
                     let (name, _) = extract_capture(m, capture_names, "const_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "const_def", content);
@@ -246,7 +235,6 @@ impl LanguageParser for RustParser {
                         });
                     }
                 }
-                // type_item
                 10 => {
                     let (name, _) = extract_capture(m, capture_names, "type_name", content);
                     let (body, body_span) = extract_capture(m, capture_names, "type_def", content);
@@ -384,7 +372,6 @@ pub enum Color {
 
 pub trait Paintable {
     fn paint(&self, color: Color) {
-        // default impl
     }
 }
 "#;

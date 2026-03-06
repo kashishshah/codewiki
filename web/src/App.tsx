@@ -10,7 +10,6 @@ import { GraphView } from "./components/GraphView";
 import { CodePanel } from "./components/CodePanel";
 import { ChatPanel } from "./components/ChatPanel";
 
-// Default: only show functions, hide everything else
 const DEFAULT_HIDDEN = new Set(FILTERABLE_KINDS.filter((k) => k !== "function"));
 
 function App() {

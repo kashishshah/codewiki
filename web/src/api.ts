@@ -36,14 +36,11 @@ export function streamChat(
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (err: Error) => void,
-): AbortController {
-  const controller = new AbortController();
-
+): void {
   fetch(`${BASE}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, context_node_ids: contextNodeIds }),
-    signal: controller.signal,
   })
     .then(async (res) => {
       if (!res.ok) throw new Error(`Chat error: ${res.status}`);
@@ -79,8 +76,6 @@ export function streamChat(
       onDone();
     })
     .catch((err) => {
-      if (err.name !== "AbortError") onError(err);
+      onError(err);
     });
-
-  return controller;
 }

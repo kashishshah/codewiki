@@ -1,5 +1,5 @@
 mod api;
-pub mod claude;
+mod cli;
 
 use anyhow::{Result, bail};
 use futures::stream::BoxStream;
@@ -11,7 +11,6 @@ use std::{
 
 use crate::cli::Backend;
 
-/// Shared session state for backends that support session reuse (Claude CLI).
 pub struct ChatState {
     pub backend: Backend,
     pub model: Option<String>,
@@ -28,7 +27,6 @@ impl ChatState {
     }
 }
 
-/// Resolve the effective backend (resolves Auto to a concrete backend).
 pub fn resolve_backend(backend: &Backend) -> Result<Backend> {
     match backend {
         Backend::Auto => resolve_auto(),
@@ -36,16 +34,16 @@ pub fn resolve_backend(backend: &Backend) -> Result<Backend> {
     }
 }
 
-/// Returns true if the effective backend is a CLI that supports tool use.
 pub fn is_cli_backend(backend: &Backend) -> bool {
     match backend {
-        Backend::ClaudeCli => true,
-        Backend::Auto => resolve_auto().is_ok_and(|b| matches!(b, Backend::ClaudeCli)),
+        Backend::ClaudeCli | Backend::CodexCli => true,
+        Backend::Auto => {
+            resolve_auto().is_ok_and(|b| matches!(b, Backend::ClaudeCli | Backend::CodexCli))
+        }
         _ => false,
     }
 }
 
-/// Send a message with code context. Returns a stream of text chunks.
 pub async fn send_message(
     state: &ChatState,
     context: &str,
@@ -55,7 +53,7 @@ pub async fn send_message(
     let backend = resolve_backend(&state.backend)?;
 
     let has_context = !context.is_empty();
-    let is_cli = matches!(backend, Backend::ClaudeCli);
+    let is_cli = matches!(backend, Backend::ClaudeCli | Backend::CodexCli);
 
     let system_prompt = if has_context {
         format!(
@@ -82,10 +80,23 @@ pub async fn send_message(
             api::stream_anthropic(&key, model, &system_prompt, question).await
         }
         Backend::ClaudeCli => {
-            if !claude::is_available() {
+            if !cli::claude_is_available() {
                 bail!("claude CLI not found in PATH");
             }
-            claude::stream_message(
+            cli::claude_stream(
+                &system_prompt,
+                question,
+                state.model.as_deref(),
+                &state.session_id,
+                project_root,
+            )
+            .await
+        }
+        Backend::CodexCli => {
+            if !cli::codex_is_available() {
+                bail!("codex CLI not found in PATH");
+            }
+            cli::codex_stream(
                 &system_prompt,
                 question,
                 state.model.as_deref(),
@@ -101,7 +112,7 @@ pub async fn send_message(
             let model = state
                 .model
                 .clone()
-                .unwrap_or_else(|| env::var("OPENAI_MODEL").unwrap_or_else(|_| "codex-5.3".into()));
+                .unwrap_or_else(|| env::var("OPENAI_MODEL").unwrap_or_else(|_| "gpt-4.1".into()));
             api::stream_openai(&base, key.as_deref(), &model, &system_prompt, question).await
         }
         Backend::Auto => unreachable!(),
@@ -115,11 +126,14 @@ fn resolve_auto() -> Result<Backend> {
     if env::var("ANTHROPIC_API_KEY").is_ok() {
         return Ok(Backend::ClaudeApi);
     }
-    if claude::is_available() {
+    if cli::claude_is_available() {
         return Ok(Backend::ClaudeCli);
+    }
+    if cli::codex_is_available() {
+        return Ok(Backend::CodexCli);
     }
     bail!(
         "no chat backend available. Set OPENAI_API_BASE (local models), \
-         ANTHROPIC_API_KEY, or install the Claude CLI."
+         ANTHROPIC_API_KEY, or install the Claude or Codex CLI."
     )
 }

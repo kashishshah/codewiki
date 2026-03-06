@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { streamChat } from "../api";
 
 interface ChatMessage {
@@ -8,49 +8,51 @@ interface ChatMessage {
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [streaming, setStreaming] = useState(false);
-  const controllerRef = useRef<AbortController | null>(null);
 
-  const sendMessage = useCallback((text: string, contextNodeIds: string[]) => {
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: text },
-      { role: "assistant", content: "" },
-    ]);
-    setStreaming(true);
+  const sendMessage = useCallback(
+    (text: string, contextNodeIds: string[]) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: text },
+        { role: "assistant", content: "" },
+      ]);
 
-    controllerRef.current = streamChat(
-      text,
-      contextNodeIds,
-      (chunk) => {
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === "assistant") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: last.content + chunk,
-            };
-          }
-          return updated;
-        });
-      },
-      () => setStreaming(false),
-      (err) => {
-        setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${err.message}` }]);
-        setStreaming(false);
-      },
-    );
-  }, []);
+      const assistantIdx = messages.length + 1;
 
-  const cancel = useCallback(() => {
-    controllerRef.current?.abort();
-    setStreaming(false);
-  }, []);
+      streamChat(
+        text,
+        contextNodeIds,
+        (chunk) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const msg = updated[assistantIdx];
+            if (msg?.role === "assistant") {
+              updated[assistantIdx] = { ...msg, content: msg.content + chunk };
+            }
+            return updated;
+          });
+        },
+        () => {},
+        (err) => {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const msg = updated[assistantIdx];
+            if (msg?.role === "assistant" && msg.content === "") {
+              updated[assistantIdx] = { ...msg, content: `Error: ${err.message}` };
+            } else {
+              updated.push({ role: "assistant", content: `Error: ${err.message}` });
+            }
+            return updated;
+          });
+        },
+      );
+    },
+    [messages.length],
+  );
 
   const clear = useCallback(() => {
     setMessages([]);
   }, []);
 
-  return { messages, streaming, sendMessage, cancel, clear };
+  return { messages, sendMessage, clear };
 }

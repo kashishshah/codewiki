@@ -8,9 +8,7 @@ use std::{path::Path, sync::Arc};
 use crate::graph::CodeNode;
 
 /// Trait for language-specific parsers. Implement this to add support for a new language.
-#[allow(dead_code)]
 pub trait LanguageParser: Send + Sync {
-    /// Display name for this language (e.g. "Rust"). Used for logging.
     fn name(&self) -> &str;
     fn extensions(&self) -> &[&str];
     fn parse_file(&self, path: &Path, content: &str) -> Result<ParseResult>;

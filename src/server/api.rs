@@ -147,7 +147,13 @@ async fn get_node(
 
     let body = if node.kind == crate::graph::NodeKind::File && node.body.is_empty() {
         let file_path = state.project_root.join(&node.file_path);
-        std::fs::read_to_string(&file_path).unwrap_or_default()
+        match std::fs::read_to_string(&file_path) {
+            Ok(content) => content,
+            Err(e) => {
+                tracing::warn!(path = %file_path.display(), error = %e, "failed to read file for code panel");
+                String::new()
+            }
+        }
     } else {
         node.body.clone()
     };
@@ -227,7 +233,10 @@ async fn chat_handler(
                     content: text,
                     done: false,
                 })
-                .unwrap_or_default();
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "failed to serialize chat event");
+                    String::new()
+                });
                 Event::default().data(data)
             }
             Err(_) => {
@@ -235,7 +244,10 @@ async fn chat_handler(
                     content: String::new(),
                     done: true,
                 })
-                .unwrap_or_default();
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "failed to serialize chat done event");
+                    String::new()
+                });
                 Event::default().data(data)
             }
         };

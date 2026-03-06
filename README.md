@@ -37,7 +37,7 @@ Prerequisites checked by the script:
 - [Rust](https://rustup.rs/) (nightly)
 - [Bun](https://bun.sh/) (for building the frontend)
 - `git`
-- Chat backend (optional): `ANTHROPIC_API_KEY`, `OPENAI_API_BASE`, or [Claude CLI](https://docs.anthropic.com/en/docs/claude-code)
+- Chat backend (optional): `ANTHROPIC_API_KEY`, `OPENAI_API_BASE`, [Claude CLI](https://docs.anthropic.com/en/docs/claude-code), or [Codex CLI](https://github.com/openai/codex)
 
 To uninstall:
 
@@ -65,6 +65,7 @@ codewiki -p 8080                            # Use a custom port
 codewiki --backend claude-api               # Force Anthropic API for chat
 codewiki --backend openai                   # Force OpenAI-compatible API
 codewiki --backend claude-cli               # Force Claude CLI (with session reuse)
+codewiki --backend codex-cli                # Force Codex CLI (with session reuse)
 
 codewiki serve /path/to/project -p 8080     # Explicit serve subcommand
 codewiki index /path/to/project             # Index only, save to .codewiki/graph.json
@@ -80,14 +81,15 @@ Codewiki supports chatting with your codebase using any LLM. Select code nodes a
 
 Use `--backend` to pick a specific backend, or leave it as `auto` (default) to auto-detect from environment:
 
-| Backend           | Flag                   | Env vars                                                       | Notes                                                             |
-| ----------------- | ---------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------- |
-| OpenAI-compatible | `--backend openai`     | `OPENAI_API_BASE` (required), `OPENAI_API_KEY`, `OPENAI_MODEL` | Ollama, LM Studio, vLLM, etc.                                     |
-| Anthropic API     | `--backend claude-api` | `ANTHROPIC_API_KEY` (required)                                 | Claude via HTTP API                                               |
-| Claude CLI        | `--backend claude-cli` | —                                                              | Uses `claude` binary, supports session reuse across chat messages |
-| Auto-detect       | `--backend auto`       | —                                                              | Tries: OPENAI_API_BASE → ANTHROPIC_API_KEY → claude CLI           |
+| Backend           | Flag                   | Env vars                                                       | Notes                                                               |
+| ----------------- | ---------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
+| OpenAI-compatible | `--backend openai`     | `OPENAI_API_BASE` (required), `OPENAI_API_KEY`, `OPENAI_MODEL` | Ollama, LM Studio, vLLM, etc.                                       |
+| Anthropic API     | `--backend claude-api` | `ANTHROPIC_API_KEY` (required)                                 | Claude via HTTP API                                                 |
+| Claude CLI        | `--backend claude-cli` | —                                                              | Uses `claude` binary, supports session reuse across chat messages   |
+| Codex CLI         | `--backend codex-cli`  | —                                                              | Uses `codex` binary, supports session reuse across chat messages    |
+| Auto-detect       | `--backend auto`       | —                                                              | Tries: OPENAI_API_BASE → ANTHROPIC_API_KEY → claude CLI → codex CLI |
 
-The Claude CLI backend reuses sessions across chat messages — the first message creates a session, and subsequent messages resume it with `--resume`, preserving conversation context.
+Both CLI backends reuse sessions across chat messages — the first message creates a session, and subsequent messages resume it, preserving conversation context.
 
 ## Development
 
