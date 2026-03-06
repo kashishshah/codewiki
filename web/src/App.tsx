@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useGraph, useNodeDetail } from "./hooks/useGraph";
 import { useChat } from "./hooks/useChat";
-import { searchNodes } from "./api";
+import { searchNodes, fetchConfig } from "./api";
+import type { AppConfig } from "./api";
 import { KIND_COLORS, FILTERABLE_KINDS } from "./constants";
 import type { GraphEdge, GraphNode } from "./types";
 import { FileTree } from "./components/FileTree";
@@ -23,10 +24,17 @@ function App() {
   const [scopedPath, setScopedFilePath] = useState<string | null>(null);
   const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set(DEFAULT_HIDDEN));
   const [hiddenLanguages, setHiddenLanguages] = useState<Set<string>>(new Set());
-  const [minLines, setMinLines] = useState(0);
+  const [minLines, setMinLines] = useState(10);
   const [hideTests, setHideTests] = useState(true);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const { detail } = useNodeDetail(selectedNodeId);
   const chat = useChat();
+
+  useEffect(() => {
+    fetchConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ cli_backend: false }));
+  }, []);
 
   const handleSelectNode = (id: string) => {
     setSelectedNodeId(id);
@@ -150,7 +158,10 @@ function App() {
         {/* Search bar + scope chip + legend overlay */}
         <div
           className="absolute top-3 z-20 flex flex-col gap-2"
-          style={{ left: sidebarOpen ? "17.5rem" : "3.5rem", maxWidth: "32rem" }}
+          style={{
+            left: sidebarOpen ? "17.5rem" : "3.5rem",
+            maxWidth: "32rem",
+          }}
         >
           <SearchBar
             onSelect={handleSelectNode}
@@ -200,9 +211,13 @@ function App() {
         {/* Code panel overlay — transparent */}
         {selectedNodeId && (
           <div
-            className="absolute right-0 top-0 bottom-0 z-10 flex flex-col transition-all bg-black/50 backdrop-blur-xl border-l border-white/[0.08]"
+            className={`absolute right-0 top-0 bottom-0 flex flex-col transition-all bg-black/50 backdrop-blur-xl border-l border-white/[0.08] ${codePanelExpanded ? "z-40" : "z-10"}`}
             style={{
-              width: codePanelOpen ? (codePanelExpanded ? "calc(100% - 3rem)" : "32rem") : "2.5rem",
+              width: codePanelOpen
+                ? codePanelExpanded
+                  ? `calc(100% - ${sidebarOpen ? "16rem" : "2.5rem"})`
+                  : "32rem"
+                : "2.5rem",
             }}
           >
             <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
@@ -213,10 +228,38 @@ function App() {
                   </span>
                   <button
                     onClick={() => setCodePanelExpanded(!codePanelExpanded)}
-                    className="p-1 text-slate-500 hover:text-slate-200 text-xs shrink-0"
+                    className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.08] transition-colors shrink-0"
                     title={codePanelExpanded ? "Shrink panel" : "Expand to full screen"}
                   >
-                    {codePanelExpanded ? "\u2596" : "\u2588"}
+                    {codePanelExpanded ? (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <polyline points="9,1 13,1 13,5" />
+                        <polyline points="5,13 1,13 1,9" />
+                        <line x1="13" y1="1" x2="8" y2="6" />
+                        <line x1="1" y1="13" x2="6" y2="8" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <polyline points="1,5 1,1 5,1" />
+                        <polyline points="13,9 13,13 9,13" />
+                        <line x1="1" y1="1" x2="6" y2="6" />
+                        <line x1="13" y1="13" x2="8" y2="8" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               )}
@@ -241,9 +284,9 @@ function App() {
           </div>
         )}
 
-        {/* Chat overlay — floating at bottom-left, clear of sidebar */}
+        {/* Chat overlay — floating at bottom-left, always above expanded code panel */}
         <div
-          className="absolute bottom-4 z-30"
+          className="absolute bottom-4 z-50"
           style={{
             left: sidebarOpen ? "17.5rem" : "3.5rem",
             width: chatOpen ? "36rem" : "auto",
@@ -255,6 +298,7 @@ function App() {
                 chat={chat}
                 contextNodeIds={contextNodeIds}
                 nodes={data.nodes}
+                cliBackend={config?.cli_backend ?? false}
                 onRemoveContext={(id) =>
                   setContextNodeIds((prev) => prev.filter((nodeId) => nodeId !== id))
                 }
@@ -268,11 +312,13 @@ function App() {
               className="px-4 py-2 flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 bg-black/50 backdrop-blur-xl border border-white/[0.1] rounded-full shadow-lg shadow-black/30 hover:bg-black/70 transition-colors"
             >
               <span>Chat</span>
-              {contextNodeIds.length > 0 && (
+              {contextNodeIds.length > 0 ? (
                 <span className="px-1.5 py-0.5 bg-cyan-500/15 border border-cyan-500/25 rounded-full text-xs text-cyan-400">
                   {contextNodeIds.length}
                 </span>
-              )}
+              ) : !config?.cli_backend ? (
+                <span className="text-xs text-slate-600">Select context first</span>
+              ) : null}
             </button>
           )}
         </div>

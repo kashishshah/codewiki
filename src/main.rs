@@ -38,27 +38,26 @@ async fn main() -> Result<()> {
         Some(Command::Serve {
             path,
             port,
-            no_open,
             backend,
             model,
         }) => {
-            let (graph, _) = index_project(path)?;
+            let (graph, project_root) = index_project(path)?;
             info!(
                 "indexed {} nodes, {} edges",
                 graph.nodes.len(),
                 graph.edges.len()
             );
-            server::serve(graph, port, no_open, backend, model).await?;
+            server::serve(graph, port, backend, model, project_root).await?;
         }
         None => {
             let args = cli.default_args;
-            let (graph, _) = index_project(args.path)?;
+            let (graph, project_root) = index_project(args.path)?;
             info!(
                 "indexed {} nodes, {} edges",
                 graph.nodes.len(),
                 graph.edges.len()
             );
-            server::serve(graph, args.port, args.no_open, args.backend, args.model).await?;
+            server::serve(graph, args.port, args.backend, args.model, project_root).await?;
         }
     }
 

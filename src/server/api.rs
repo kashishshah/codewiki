@@ -12,14 +12,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::{chat, graph::FileEntry};
 
+#[derive(Serialize)]
+struct ConfigResponse {
+    /// Whether the backend supports tool-use (CLI backends can explore the project without context).
+    cli_backend: bool,
+}
+
+async fn get_config(State(state): State<Arc<AppState>>) -> Json<ConfigResponse> {
+    Json(ConfigResponse {
+        cli_backend: chat::is_cli_backend(&state.chat.backend),
+    })
+}
+
 use super::AppState;
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/graph", get(get_graph))
-        .route("/node/{id}", get(get_node))
+        .route("/node/{*id}", get(get_node))
         .route("/search", get(search_nodes))
         .route("/chat", post(chat_handler))
+        .route("/config", get(get_config))
 }
 
 #[derive(Serialize)]
@@ -132,6 +145,13 @@ async fn get_node(
 ) -> Result<Json<NodeDetailResponse>, StatusCode> {
     let node = state.graph.nodes.get(&id).ok_or(StatusCode::NOT_FOUND)?;
 
+    let body = if node.kind == crate::graph::NodeKind::File && node.body.is_empty() {
+        let file_path = state.project_root.join(&node.file_path);
+        std::fs::read_to_string(&file_path).unwrap_or_default()
+    } else {
+        node.body.clone()
+    };
+
     Ok(Json(NodeDetailResponse {
         id: node.id.clone(),
         name: node.name.clone(),
@@ -140,7 +160,7 @@ async fn get_node(
         language: node.language.clone(),
         start_line: node.span.start_line,
         end_line: node.span.end_line,
-        body: node.body.clone(),
+        body,
         visibility: node.visibility.clone(),
         children: node.children.clone(),
         parent: node.parent.clone(),
@@ -193,7 +213,7 @@ async fn chat_handler(
         }
     }
 
-    let stream = chat::send_message(&state.chat, &context, &req.message)
+    let stream = chat::send_message(&state.chat, &context, &req.message, &state.project_root)
         .await
         .map_err(|e| {
             tracing::error!("chat error: {e}");

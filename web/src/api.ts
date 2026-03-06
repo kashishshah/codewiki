@@ -2,6 +2,16 @@ import type { GraphData, NodeDetail } from "./types";
 
 const BASE = "/api";
 
+export interface AppConfig {
+  cli_backend: boolean;
+}
+
+export async function fetchConfig(): Promise<AppConfig> {
+  const res = await fetch(`${BASE}/config`);
+  if (!res.ok) throw new Error(`Failed to fetch config: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchGraph(): Promise<GraphData> {
   const res = await fetch(`${BASE}/graph`);
   if (!res.ok) throw new Error(`Failed to fetch graph: ${res.status}`);
@@ -9,7 +19,7 @@ export async function fetchGraph(): Promise<GraphData> {
 }
 
 export async function fetchNode(id: string): Promise<NodeDetail> {
-  const res = await fetch(`${BASE}/node/${encodeURIComponent(id)}`);
+  const res = await fetch(`${BASE}/node/${id}`);
   if (!res.ok) throw new Error(`Failed to fetch node: ${res.status}`);
   return res.json();
 }

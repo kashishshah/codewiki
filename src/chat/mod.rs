@@ -5,6 +5,7 @@ use anyhow::{Result, bail};
 use futures::stream::BoxStream;
 use std::{
     env,
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -27,21 +28,50 @@ impl ChatState {
     }
 }
 
+/// Resolve the effective backend (resolves Auto to a concrete backend).
+pub fn resolve_backend(backend: &Backend) -> Result<Backend> {
+    match backend {
+        Backend::Auto => resolve_auto(),
+        other => Ok(other.clone()),
+    }
+}
+
+/// Returns true if the effective backend is a CLI that supports tool use.
+pub fn is_cli_backend(backend: &Backend) -> bool {
+    match backend {
+        Backend::ClaudeCli => true,
+        Backend::Auto => resolve_auto().is_ok_and(|b| matches!(b, Backend::ClaudeCli)),
+        _ => false,
+    }
+}
+
 /// Send a message with code context. Returns a stream of text chunks.
 pub async fn send_message(
     state: &ChatState,
     context: &str,
     question: &str,
+    project_root: &Path,
 ) -> Result<BoxStream<'static, Result<String>>> {
-    let system_prompt = format!(
-        "You are a code assistant. The user is exploring a codebase and has selected \
-         specific code entities as context. Answer their question based on this context.\n\n\
-         ## Code Context\n{context}"
-    );
+    let backend = resolve_backend(&state.backend)?;
 
-    let backend = match &state.backend {
-        Backend::Auto => resolve_auto()?,
-        other => other.clone(),
+    let has_context = !context.is_empty();
+    let is_cli = matches!(backend, Backend::ClaudeCli);
+
+    let system_prompt = if has_context {
+        format!(
+            "You are a code assistant. The user is exploring a codebase and has selected \
+             specific code entities as context. Answer their question based on this context.\n\n\
+             ## Code Context\n{context}"
+        )
+    } else if is_cli {
+        format!(
+            "You are a code assistant. The user is exploring a codebase at {}. \
+             No specific code context was selected — use your tools to read files \
+             and explore the project to answer the question.",
+            project_root.display()
+        )
+    } else {
+        bail!("no code context selected — select nodes before chatting with an API backend")
     };
 
     match backend {
@@ -60,6 +90,7 @@ pub async fn send_message(
                 question,
                 state.model.as_deref(),
                 &state.session_id,
+                project_root,
             )
             .await
         }

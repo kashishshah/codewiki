@@ -25,10 +25,6 @@ pub struct DefaultArgs {
     #[arg(short, long, default_value = "3000")]
     pub port: u16,
 
-    /// Don't open browser automatically
-    #[arg(long)]
-    pub no_open: bool,
-
     /// Chat backend to use [default: auto-detect]
     #[arg(long, value_enum, default_value = "auto")]
     pub backend: Backend,
@@ -55,10 +51,6 @@ pub enum Command {
         /// Port to serve on
         #[arg(short, long, default_value = "3000")]
         port: u16,
-
-        /// Don't open browser automatically
-        #[arg(long)]
-        no_open: bool,
 
         /// Chat backend to use [default: auto-detect]
         #[arg(long, value_enum, default_value = "auto")]

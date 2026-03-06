@@ -15,18 +15,20 @@ use crate::{chat::ChatState, cli::Backend, graph::CodeGraph};
 pub struct AppState {
     pub graph: CodeGraph,
     pub chat: ChatState,
+    pub project_root: std::path::PathBuf,
 }
 
 pub async fn serve(
     graph: CodeGraph,
     port: u16,
-    no_open: bool,
     backend: Backend,
     model: Option<String>,
+    project_root: std::path::PathBuf,
 ) -> Result<()> {
     let state = Arc::new(AppState {
         graph,
         chat: ChatState::new(backend, model),
+        project_root,
     });
     let dist_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("web/dist");
     let spa =
@@ -44,10 +46,6 @@ pub async fn serve(
 
     info!("serving at {url}");
     println!("codewiki running at {url}");
-
-    if !no_open {
-        let _ = open::that(&url);
-    }
 
     axum::serve(listener, app).await?;
 

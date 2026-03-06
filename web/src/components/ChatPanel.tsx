@@ -12,6 +12,7 @@ interface ChatPanelProps {
   };
   contextNodeIds: string[];
   nodes: GraphNode[];
+  cliBackend: boolean;
   onRemoveContext: (id: string) => void;
   onClearContext: () => void;
   onClose: () => void;
@@ -21,6 +22,7 @@ export function ChatPanel({
   chat,
   contextNodeIds,
   nodes,
+  cliBackend,
   onRemoveContext,
   onClearContext,
   onClose,
@@ -32,9 +34,11 @@ export function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat.messages]);
 
+  const needsContext = !cliBackend && contextNodeIds.length === 0;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || needsContext) return;
     chat.sendMessage(input.trim(), contextNodeIds);
     setInput("");
   };
@@ -110,7 +114,11 @@ export function ChatPanel({
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
         {chat.messages.length === 0 && (
           <p className="text-sm text-slate-600 text-center mt-10">
-            Double-click nodes to add context, then ask a question.
+            {needsContext
+              ? "Double-click nodes to add context before chatting."
+              : cliBackend && contextNodeIds.length === 0
+                ? "Ask anything — the CLI will explore the project to answer."
+                : "Double-click nodes to add context, then ask a question."}
           </p>
         )}
         {chat.messages.map((msg, i) => (
@@ -148,12 +156,14 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              contextNodeIds.length > 0
-                ? "Ask about the selected code..."
-                : "Add context nodes first (double-click)..."
+              needsContext
+                ? "Select context nodes first (double-click)..."
+                : contextNodeIds.length > 0
+                  ? "Ask about the selected code..."
+                  : "Ask anything about the codebase..."
             }
             className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 focus:outline-none py-1"
-            disabled={chat.streaming}
+            disabled={chat.streaming || needsContext}
           />
           {chat.streaming ? (
             <button
@@ -167,7 +177,7 @@ export function ChatPanel({
             <button
               type="submit"
               className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs hover:bg-blue-500/30 transition-colors disabled:opacity-30"
-              disabled={!input.trim()}
+              disabled={!input.trim() || needsContext}
             >
               Send
             </button>

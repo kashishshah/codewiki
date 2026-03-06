@@ -21,11 +21,13 @@ pub async fn stream_message(
     question: &str,
     model: Option<&str>,
     session_id: &Arc<Mutex<Option<String>>>,
+    project_root: &std::path::Path,
 ) -> Result<BoxStream<'static, Result<String>>> {
     let prompt = format!("{system_prompt}\n\nUser question: {question}");
 
     let mut cmd = Command::new("claude");
     cmd.env_remove("CLAUDECODE")
+        .current_dir(project_root)
         .arg("--print")
         .arg("--verbose")
         .arg("--output-format")

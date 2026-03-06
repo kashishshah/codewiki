@@ -1,68 +1,76 @@
 # Codewiki
 
-Codewiki is a CLI tool that parses codebases, builds a graph of code entities (functions, structs, traits, etc.), and serves an interactive web visualization. Click through a force-directed graph, view source code with syntax highlighting, and chat with your codebase.
+Codewiki is a CLI tool that parses codebases, builds a graph of code entities (functions, structs, classes, modules, etc.), and serves an interactive web visualization. Click through the graph, view source code with syntax highlighting, and chat with your codebase.
 
 ## Features
 
-- **Code graph** — parses source files into a graph of functions, structs, enums, traits, impls, modules, constants, and type aliases
+- **Multi-language** — Rust, Python, and Elixir via tree-sitter
+- **Code graph** — parses source files into a graph of functions, structs, classes, enums, traits, impls, modules, constants, and type aliases
 - **Interactive visualization** — force-directed D3.js graph with zoom, pan, drag, and color-coded node types
 - **File tree sidebar** — navigate the project structure, click to focus the graph
-- **Source code panel** — syntax-highlighted code viewer with metadata (file, line range, visibility)
+- **Source code panel** — syntax-highlighted code viewer with full-screen expand mode
 - **Call graph edges** — visualize function-to-function call relationships
-- **Chat with codebase** — select code nodes as context, ask Claude questions via API or CLI
-- **Streaming responses** — chat responses stream in real-time via SSE
+- **Chat with codebase** — select code nodes as context, ask questions via Claude/Codex CLI or OpenAI-compatible APIs
 - **Search** — fuzzy search across all symbols in the codebase
+- **Filters** — filter by node kind, language, min lines, and hide tests
 - **Respects .gitignore** — only indexes files tracked by git
 - **Extensible** — add new language support by implementing a single trait
 
 ## Supported languages
 
-- **Rust** — full support via tree-sitter (functions, structs, enums, traits, impls, modules, constants, type aliases, calls, imports)
-
-More languages can be added by implementing the `LanguageParser` trait and adding tree-sitter queries.
+| Language   | Extensions    | Entities extracted                                                                         |
+| ---------- | ------------- | ------------------------------------------------------------------------------------------ |
+| **Rust**   | `.rs`         | functions, structs, enums, traits, impls, modules, constants, type aliases, calls, imports |
+| **Python** | `.py`         | functions, classes, calls, imports                                                         |
+| **Elixir** | `.ex`, `.exs` | modules, functions, protocols, impls, calls, imports                                       |
 
 ## Installation
 
-Prerequisites:
+```sh
+curl -fsSL https://raw.githubusercontent.com/kashishshah/codewiki/master/scripts/install.sh | sh
+```
+
+This checks all prerequisites, builds the frontend, then installs codewiki via `cargo install`. Works on macOS and Linux.
+
+Prerequisites checked by the script:
 
 - [Rust](https://rustup.rs/) (nightly)
-- [Node.js](https://nodejs.org/) with [Bun](https://bun.sh/) (for building the frontend)
+- [Bun](https://bun.sh/) (for building the frontend)
+- `git`
+- Chat backend (optional): `ANTHROPIC_API_KEY`, `OPENAI_API_BASE`, or [Claude CLI](https://docs.anthropic.com/en/docs/claude-code)
+
+To uninstall:
 
 ```sh
-git clone https://github.com/kashishshah/codewiki.git
-cd codewiki
-
-# Build frontend
-cd web && bun install && bun run build && cd ..
-
-# Build and install
-cargo install --path .
+cargo uninstall codewiki
 ```
 
 ## Quick start
 
 ```sh
-# Visualize any Rust project
-codewiki serve /path/to/my-rust-project
+# Visualize any project by just doing `cd` into it and run codewiki
+cd /path/to/my-project
+codewiki
 
-# Just index without starting the server
-codewiki index /path/to/my-rust-project
+# Or pass a path directly
+codewiki /path/to/my-project
 ```
 
 ## Usage
 
 ```sh
-codewiki serve                              # Index current directory and start visualization
-codewiki serve /path/to/project             # Index a specific project
-codewiki serve -p 8080                      # Use a custom port
-codewiki serve --no-open                    # Don't auto-open browser
-codewiki serve --backend claude-cli         # Force Claude CLI (with session reuse)
-codewiki serve --backend claude-api         # Force Anthropic API
-codewiki serve --backend openai             # Force OpenAI-compatible API
+codewiki                                    # Index and serve current directory
+codewiki /path/to/project                   # Index and serve a specific project
+codewiki -p 8080                            # Use a custom port
+codewiki --backend claude-api               # Force Anthropic API for chat
+codewiki --backend openai                   # Force OpenAI-compatible API
+codewiki --backend claude-cli               # Force Claude CLI (with session reuse)
 
-codewiki index                              # Index current directory, save to .codewiki/graph.json
-codewiki index /path/to/project             # Index a specific project
+codewiki serve /path/to/project -p 8080     # Explicit serve subcommand
+codewiki index /path/to/project             # Index only, save to .codewiki/graph.json
 ```
+
+Running `codewiki` with no subcommand is equivalent to `codewiki serve .`.
 
 Run `codewiki --help` for the full list of CLI flags and subcommands.
 
@@ -80,13 +88,6 @@ Use `--backend` to pick a specific backend, or leave it as `auto` (default) to a
 | Auto-detect       | `--backend auto`       | —                                                              | Tries: OPENAI_API_BASE → ANTHROPIC_API_KEY → claude CLI           |
 
 The Claude CLI backend reuses sessions across chat messages — the first message creates a session, and subsequent messages resume it with `--resume`, preserving conversation context.
-
-## Adding a new language
-
-1. Add the tree-sitter grammar crate to `Cargo.toml`
-2. Create `src/parser/<lang>.rs` implementing the `LanguageParser` trait
-3. Add tree-sitter queries in `src/parser/queries/<lang>.scm`
-4. Register in `ParserRegistry::new()` in `src/parser/mod.rs`
 
 ## Development
 
