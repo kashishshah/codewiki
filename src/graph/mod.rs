@@ -53,6 +53,7 @@ impl CodeGraph {
     /// Walk a directory, parse all supported files, and build the graph.
     pub fn from_directory(root: &Path, registry: &ParserRegistry) -> Result<Self> {
         let mut graph = Self::new();
+        let mut all_raw_calls: Vec<(String, String)> = Vec::new();
         let root = root
             .canonicalize()
             .context("failed to canonicalize project root")?;
@@ -162,23 +163,35 @@ impl CodeGraph {
                 file_node.children = child_ids;
             }
 
-            for (caller_id, callee_name) in &result.calls {
-                let caller_id = caller_id.replace(&path.to_string_lossy().to_string(), &rel_path);
-                let callee_id = graph
-                    .nodes
-                    .values()
-                    .find(|n| n.name == *callee_name && n.kind == NodeKind::Function)
-                    .map(|n| n.id.clone());
-                if let Some(callee_id) = callee_id
-                    && caller_id != callee_id
-                {
-                    graph.add_edge(CodeEdge {
-                        from: caller_id,
-                        to: callee_id,
+            all_raw_calls.extend(result.calls);
+        }
+
+        // Resolve calls in O(n+c) using a function name index instead of O(n*c) linear scan.
+        // Done after all files are parsed so cross-file calls are also resolved.
+        {
+            let fn_index: HashMap<&str, &str> = graph
+                .nodes
+                .values()
+                .filter(|n| n.kind == NodeKind::Function)
+                .map(|n| (n.name.as_str(), n.id.as_str()))
+                .collect();
+
+            let call_edges: Vec<CodeEdge> = all_raw_calls
+                .iter()
+                .filter_map(|(caller_id, callee_name)| {
+                    let callee_id = *fn_index.get(callee_name.as_str())?;
+                    if caller_id == callee_id {
+                        return None;
+                    }
+                    Some(CodeEdge {
+                        from: caller_id.clone(),
+                        to: callee_id.to_string(),
                         kind: EdgeKind::Calls,
-                    });
-                }
-            }
+                    })
+                })
+                .collect();
+
+            graph.edges.extend(call_edges);
         }
 
         graph.file_tree = build_file_tree(&graph)?;

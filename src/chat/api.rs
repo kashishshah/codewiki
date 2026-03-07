@@ -124,8 +124,8 @@ fn stream_sse(
             buffer.push_str(&String::from_utf8_lossy(&chunk));
 
             while let Some(pos) = buffer.find('\n') {
-                let line = buffer[..pos].trim().to_string();
-                buffer = buffer[pos + 1..].to_string();
+                let line: String = buffer[..pos].trim().into();
+                buffer.drain(..pos + 1);
 
                 if let Some(data) = line.strip_prefix("data: ") {
                     if data == "[DONE]" {
